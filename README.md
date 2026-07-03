@@ -16,9 +16,9 @@ summary, and a self-contained HTML review page.
 
 **Design goals — why "featherweight":**
 
-- **One file, no framework lock-in.** [`eval.py`](eval.py) is ~850 lines of
-  plain Python with two dependencies (`anthropic`, `openai`). Read it in one
-  sitting; fork it without ceremony.
+- **One file, no framework lock-in.** [`eval.py`](eval.py) is ~1,050 lines of
+  plain Python with two dependencies (`anthropic`, `openai`) — everything else
+  is the standard library. Read it in one sitting; fork it without ceremony.
 - **Tasks are data, not code.** A task is a JSON file. Non-engineers can author
   them; they diff cleanly in review.
 - **Deterministic floor + optional judged quality.** Most real-world answers
@@ -357,21 +357,23 @@ them — unit tests are a stronger signal.
 
 The harness is meant to be forked. The common extensions and where they live:
 
-- **A new checker type.** Add one `if ctype == "..."` branch to `_check()` in
-  [`eval.py`](eval.py). A checker receives the response `text` and the normalized
-  `tool_calls`, and returns `(passed: bool, detail: str)`. Because `all`
-  recurses through `_check`, your new type immediately composes with the others.
-  Natural additions: `max_words` (format limits), `json_schema` (validate a JSON
-  block), `sql_result` (run the model's SQL against an in-memory SQLite fixture
-  and assert the result set), `numeric_close` (answer within a tolerance).
+- **A new checker type.** Write a `(spec, text, tool_calls) -> (passed, detail)`
+  function and register it with `@checker("<type>")` in [`eval.py`](eval.py) —
+  there is no central dispatch to edit. `run_check` looks your type up by name,
+  and because `all` recurses through `run_check`, the new type immediately
+  composes with the others. Natural additions: `max_words` (format limits),
+  `json_schema` (validate a JSON block), `sql_result` (run the model's SQL
+  against an in-memory SQLite fixture and assert the result set), `numeric_close`
+  (answer within a tolerance).
 - **A new provider or model.** For a new *model* on an existing provider, add an
-  entry to `models.json`. For a new *provider protocol*, add a
-  `call_<provider>(cfg, prompt, tools=None)` function that returns the standard
-  result dict (`text`, `tool_calls`, `stop_reason`, `latency_s`,
-  `input_tokens`, `output_tokens`, and `refusal`/`refusal_category` if
-  applicable) and route to it from `call_model()`. Everything downstream —
-  checkers, cost, the report, rubric judging — works unchanged because it only
-  sees that dict.
+  entry to `models.json`. For a new *provider protocol*, write a
+  `(cfg, prompt, tools=None) -> ModelResponse` function and register it with
+  `@provider("<name>", api="<api>")`; `call_model` dispatches on the
+  `(provider, api)` pair from `models.json` and stamps `latency_s` for you. Fill
+  in the `ModelResponse` (`text`, `tool_calls`, `stop_reason`, `input_tokens`,
+  `output_tokens`, and `refusal`/`refusal_category` if applicable). Everything
+  downstream — checkers, cost, the report, rubric judging — works unchanged
+  because it only sees that object.
 - **A new task field.** Fields you add to a task JSON are available on the
   `task` dict in `main()`; thread them where you need them (e.g. a per-task
   `system` prompt, a per-task `max_tokens`, a `tags` list for grouping).
@@ -389,9 +391,10 @@ The harness is meant to be forked. The common extensions and where they live:
   `JUDGE_PROMPT`.
 
 The per-trial record schema (keys in `results.jsonl`) is the stable contract
-between the harness and your tooling: `run_id, task, model, trial, timestamp,
-text, tool_calls, passed, check_detail, refusal, refusal_category, stop_reason,
-latency_s, input_tokens, output_tokens, cost_usd, rubric, rubric_mean, error`.
+between the harness and your tooling: `run_id, task, task_hash, model, trial,
+timestamp, text, tool_calls, passed, check_detail, refusal, refusal_category,
+stop_reason, latency_s, input_tokens, output_tokens, cost_usd, rubric,
+rubric_mean, error`.
 
 ## What ships — the sample task library
 
