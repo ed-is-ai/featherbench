@@ -26,6 +26,7 @@ WARNING: tasks with a "python_tests" checker EXECUTE model-generated code
 locally. Run this harness on an isolated machine (see README).
 """
 import argparse
+import hashlib
 import html
 import itertools
 import json
@@ -397,6 +398,16 @@ def rubric_mean(scores, exclude=None):
 
 # ---------------------------------------------------------------- tasks + models
 
+def task_hash(task):
+    """Short content hash of the parts of a task that affect scoring — prompt,
+    checker, tools (id/category/description are cosmetic and excluded). Stamped
+    into every record so the summary can warn when one task id blends results
+    from more than one task version across appended runs."""
+    payload = json.dumps({"prompt": task.get("prompt"), "checker": task.get("checker"),
+                          "tools": task.get("tools")}, sort_keys=True)
+    return hashlib.sha256(payload.encode()).hexdigest()[:12]
+
+
 def load_tasks(task_filter):
     tasks = []
     for f in sorted(TASKS_DIR.glob("*.json")):
@@ -495,6 +506,16 @@ def md_table(header, rows):
     return lines
 
 
+def _mixed_hash_tasks(records):
+    """task id -> set of task_hashes, for ids whose records span >1 version.
+    Records without a task_hash (from before hashing existed) are ignored."""
+    by_task = {}
+    for r in records:
+        if r.get("task_hash"):
+            by_task.setdefault(r["task"], set()).add(r["task_hash"])
+    return {t: hs for t, hs in by_task.items() if len(hs) > 1}
+
+
 def write_summary(records):
     """Aggregate all records (including past runs) into results/summary.md."""
     by_model = group_by(records, "model")
@@ -502,6 +523,15 @@ def write_summary(records):
     lines = ["# Eval summary", "",
              f"Generated {stamp}. All models run through the same harness — scores are cross-comparable.",
              ""]
+    stale = _mixed_hash_tasks(records)
+    if stale:
+        lines += ["> ⚠️ **Mixed task versions.** These task ids have records from more "
+                  "than one prompt/checker version in `results.jsonl`, so their aggregates "
+                  "blend different tasks: **" + ", ".join(sorted(stale)) + "**. Delete "
+                  "`results.jsonl` or re-run only the changed tasks to compare cleanly.", ""]
+        for t in sorted(stale):
+            print(f"WARNING: task {t!r} has records from {len(stale[t])} different "
+                  "prompt/checker versions in results.jsonl — the summary blends them")
     lines += _overall_section(by_model)
     lines += _per_task_section(records, by_model)
     lines += _category_section(records, by_model)
@@ -832,8 +862,9 @@ def run_trial(run_id, task, model_name, cfg, trial, judges):
     rest of the run keeps going.
     """
     print(f"-> {task['id']} / {model_name} / trial {trial}", flush=True)
-    record = {"run_id": run_id, "task": task["id"], "model": model_name,
-              "trial": trial, "timestamp": datetime.now(timezone.utc).isoformat()}
+    record = {"run_id": run_id, "task": task["id"], "task_hash": task_hash(task),
+              "model": model_name, "trial": trial,
+              "timestamp": datetime.now(timezone.utc).isoformat()}
     try:
         resp = call_model(model_name, cfg, task["prompt"], task.get("tools"))
         record.update(asdict(resp))

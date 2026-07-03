@@ -132,6 +132,16 @@ class TestProvidersAndSelection(unittest.TestCase):
         self.assertAlmostEqual(harness.cost_usd(cfg, 1_000_000, 100_000), 15.0)
         self.assertIsNone(harness.cost_usd({}, 1, 1))
 
+    def test_task_hash_tracks_scoring_fields_only(self):
+        a = {"id": "t", "prompt": "p", "checker": {"type": "contains", "value": "x"}}
+        # id/category/description are cosmetic -> same hash
+        self.assertEqual(harness.task_hash(a),
+                         harness.task_hash(dict(a, id="other", category="c", description="d")))
+        # prompt or checker change -> different hash
+        self.assertNotEqual(harness.task_hash(a), harness.task_hash(dict(a, prompt="q")))
+        self.assertNotEqual(harness.task_hash(a),
+                            harness.task_hash(dict(a, checker={"type": "contains", "value": "y"})))
+
     def test_wilson_interval(self):
         self.assertIsNone(harness.wilson_interval(0, 0))
         lo, hi = harness.wilson_interval(1, 1)       # 1/1: wide, capped at 1.0
@@ -175,6 +185,20 @@ class TestReports(unittest.TestCase):
         self.assertIn("Wilson interval", md)
         self.assertIn("| t-refuse | refused | — |", md)
         self.assertIn("## Judge bias matrix", md)
+
+    def test_summary_warns_on_mixed_task_versions(self):
+        recs = [dict(FIXTURE_RECORDS[0], task_hash="aaaaaaaaaaaa"),
+                dict(FIXTURE_RECORDS[0], task_hash="bbbbbbbbbbbb")]
+        with mock.patch("builtins.print"):  # suppress the console warning
+            harness.write_summary(recs)
+        md = (harness.RESULTS_DIR / "summary.md").read_text()
+        self.assertIn("Mixed task versions", md)
+        self.assertIn("t-code", md)
+
+    def test_summary_no_warning_for_single_version(self):
+        recs = [dict(r, task_hash="samehash1234") for r in FIXTURE_RECORDS]
+        harness.write_summary(recs)
+        self.assertNotIn("Mixed task versions", (harness.RESULTS_DIR / "summary.md").read_text())
 
     def test_html_report_renders_and_escapes(self):
         harness.write_html_report(FIXTURE_RECORDS, {})
