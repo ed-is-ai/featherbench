@@ -65,6 +65,16 @@ class TestCheckers(unittest.TestCase):
         ok, detail = self.check({"type": "python_tests", "test_code": ""}, "no code here")
         self.assertEqual((ok, detail), (False, "no code block in response"))
 
+    def test_python_tests_strips_environment(self):
+        # model-generated code must not see the harness's API keys
+        leaky = "```python\nimport os\nSECRET = os.environ.get('FAKE_API_KEY')\n```"
+        with mock.patch.dict("os.environ", {"FAKE_API_KEY": "sk-secret"}):
+            ok, _ = self.check(
+                {"type": "python_tests",
+                 "test_code": "from solution import SECRET\nassert SECRET is None\n"},
+                leaky)
+        self.assertTrue(ok)
+
     def test_extract_code_takes_last_block(self):
         self.assertEqual(harness.extract_code("```python\nfirst\n```\n```py\nsecond\n```"),
                          "second\n")

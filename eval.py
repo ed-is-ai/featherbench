@@ -311,6 +311,8 @@ def check_python_tests(spec, text, tool_calls):
                 [sys.executable, "run_tests.py"],
                 cwd=d, capture_output=True, text=True,
                 timeout=spec.get("timeout_s", 30),
+                # model-generated code must not see API keys etc.
+                env={"PATH": os.environ.get("PATH", "")},
             )
         except subprocess.TimeoutExpired:
             return False, "tests timed out"

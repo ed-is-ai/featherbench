@@ -78,7 +78,9 @@ particular should be adjusted to what your accounts expose.
 ## ⚠️ Run this on a sandboxed machine
 
 Tasks with a `python_tests` checker **execute model-generated code** with a
-subprocess timeout but no other isolation. Run the harness on an isolated
+subprocess timeout and a stripped environment (the subprocess sees `PATH`
+only, so your API keys are not exposed to it) — but no filesystem or network
+isolation. Run the harness on an isolated
 machine (or containerise the checker — see [Extension points](#extension-points)),
 not on a machine with personal data or broad credentials.
 
