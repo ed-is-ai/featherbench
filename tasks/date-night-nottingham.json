@@ -1,0 +1,15 @@
+{
+  "id": "date-night-nottingham",
+  "description": "Local-knowledge task with hallucination risk — models may invent venues or recommend closed ones. Checkable floor: five distinct ideas, genuinely Nottingham-specific references, costs given, the budget constraint acknowledged, and a caveat to check/book ahead (venue info in training data goes stale). Whether the named venues actually exist and are still open: verify manually from results.jsonl — that is the interesting comparison.",
+  "prompt": "My wife and I live in Nottingham and have a babysitter booked for Saturday evening. Give me 5 date night ideas — we've done cinema-and-pizza to death. Requirements: at least one idea involving food, at least one that's active or outdoors, and at least one budget option under £30 total for both of us. Number the ideas 1 to 5, give a rough cost for each, and be specific to Nottingham — actual places and areas, not generic suggestions.",
+  "checker": {
+    "type": "all",
+    "checks": [
+      {"type": "regex", "pattern": "(?s)\\n[#*\\s]*1[\\.\\)].*\\n[#*\\s]*2[\\.\\)].*\\n[#*\\s]*3[\\.\\)].*\\n[#*\\s]*4[\\.\\)].*\\n[#*\\s]*5[\\.\\)]", "label": "five numbered ideas"},
+      {"type": "regex", "pattern": "(?i)(lace market|hockley|west bridgford|beeston|trent|castle|caves|sneinton|canal|arboretum|wollaton|newstead|attenborough|broadway|theatre royal|playhouse|old market square|goose fair|bierkeller|malt cross)", "label": "names a real Nottingham place or area"},
+      {"type": "regex", "pattern": "£\\s?\\d", "label": "gives costs in pounds"},
+      {"type": "regex", "pattern": "(?i)(under\\s*£?\\s*30|budget|cheap|free)", "label": "acknowledges the under-£30 budget option"},
+      {"type": "regex", "pattern": "(?i)(book|check|confirm|verify|reserve)[^.\\n]{0,70}(ahead|advance|opening|hours|times|availability|website|still|before)", "label": "advises booking/checking ahead (grounded about stale info)"}
+    ]
+  }
+}
