@@ -190,6 +190,12 @@ class TestProvidersAndSelection(unittest.TestCase):
         with self.assertRaises(SystemExit):
             harness.select_models("nope", catalog)
 
+    def test_select_tasks_unknown_id_or_category_exits(self):
+        with self.assertRaises(SystemExit):
+            harness.select_tasks("no-such-task-xyz", None)
+        with self.assertRaises(SystemExit):
+            harness.select_tasks(None, "no-such-category-xyz")
+
     def test_cost_usd(self):
         cfg = {"pricing_per_mtok": {"input": 10.0, "output": 50.0}}
         self.assertAlmostEqual(harness.cost_usd(cfg, 1_000_000, 100_000), 15.0)

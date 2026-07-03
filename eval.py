@@ -507,11 +507,23 @@ def select_models(spec, catalog):
 
 
 def select_tasks(tasks_spec, categories_spec):
-    """--tasks names ids, --categories names categories; they intersect."""
-    tasks = load_tasks({t.strip() for t in tasks_spec.split(",")} if tasks_spec else None)
+    """--tasks names ids, --categories names categories; they intersect. An
+    unknown id or category aborts with the valid list, like --models — a typo'd
+    filter shouldn't silently drop work and waste a run."""
+    all_tasks = load_tasks(None)
+    if tasks_spec:
+        wanted = {t.strip() for t in tasks_spec.split(",") if t.strip()}
+        available = {t["id"] for t in all_tasks}
+        unknown = wanted - available
+        if unknown:
+            sys.exit("unknown task id(s): %s\navailable: %s"
+                     % (", ".join(sorted(unknown)), ", ".join(sorted(available))))
+        tasks = [t for t in all_tasks if t["id"] in wanted]
+    else:
+        tasks = all_tasks
     if categories_spec:
         wanted = {c.strip() for c in categories_spec.split(",") if c.strip()}
-        available = {t.get("category", "uncategorized") for t in load_tasks(None)}
+        available = {t.get("category", "uncategorized") for t in all_tasks}
         unknown = wanted - available
         if unknown:
             sys.exit("unknown categor(y/ies): %s\navailable: %s"
