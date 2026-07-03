@@ -80,7 +80,26 @@ particular should be adjusted to what your accounts expose.
 Tasks with a `python_tests` checker **execute model-generated code** with a
 subprocess timeout and a stripped environment (the subprocess sees `PATH`
 only, so your API keys are not exposed to it) — but no filesystem or network
-isolation. Run the harness on an isolated
+isolation.
+
+An easy way to add that isolation is [nono](https://github.com/nolabs-ai/nono)
+(`brew install nono`), which scopes filesystem access to the repo directory
+and always blocks `~/.ssh`, `~/.aws` and shell configs:
+
+```sh
+nono run --allow . -- python3 eval.py
+```
+
+Optionally restrict the network to just the model APIs (activates nono's
+proxy mode):
+
+```sh
+nono run --allow . \
+  --allow-domain api.anthropic.com \
+  --allow-domain api.openai.com \
+  --allow-domain api.z.ai \
+  -- python3 eval.py
+``` Run the harness on an isolated
 machine (or containerise the checker — see [Extension points](#extension-points)),
 not on a machine with personal data or broad credentials.
 
@@ -303,9 +322,11 @@ The harness is meant to be forked. The common extensions and where they live:
   append-only across runs — point any notebook or BI tool at it. `write_summary()`
   and `write_html_report()` both regenerate from the full JSONL, so you can
   restyle the report or add aggregate columns without re-running models.
-- **Sandboxing model code.** Wrap the `python_tests` subprocess in
-  `_check()` with your container runtime of choice (e.g. `docker run --rm
-  --network=none`) to remove the "run on an isolated machine" caveat.
+- **Sandboxing model code.** Run the whole harness under
+  [nono](https://github.com/nolabs-ai/nono) (see above), or wrap the
+  `python_tests` subprocess in `check_python_tests()` with your container
+  runtime of choice (e.g. `docker run --rm --network=none`) for the tightest
+  per-checker isolation.
 - **The judge panel.** `run_rubric()` uses the selected model set as judges. Swap
   in a fixed panel, add an external judge, or change the 1–10 scale by editing
   `JUDGE_PROMPT`.
