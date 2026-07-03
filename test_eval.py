@@ -75,10 +75,20 @@ class TestCheckers(unittest.TestCase):
                 leaky)
         self.assertTrue(ok)
 
-    def test_extract_code_takes_last_block(self):
+    def test_extract_code_prefers_last_python_block(self):
         self.assertEqual(harness.extract_code("```python\nfirst\n```\n```py\nsecond\n```"),
                          "second\n")
         self.assertIsNone(harness.extract_code("no code"))
+
+    def test_extract_code_ignores_trailing_untagged_example(self):
+        # the real solution is python-tagged; a trailing bare example must not win
+        text = ("```python\ndef add(a, b):\n    return a + b\n```\n"
+                "Example:\n```\n>>> add(2, 3)\n5\n```")
+        self.assertIn("def add", harness.extract_code(text))
+
+    def test_extract_code_falls_back_to_largest_when_untagged(self):
+        text = "```\nx = 1\n```\ntiny\n```\nx = 1\ny = 2\nz = 3\n```"
+        self.assertEqual(harness.extract_code(text), "x = 1\ny = 2\nz = 3\n")
 
 
 class TestRubric(unittest.TestCase):

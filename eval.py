@@ -324,13 +324,25 @@ def check_python_tests(spec, text, tool_calls):
         return False, f"tests failed: {tail}"
 
 
-CODE_BLOCK_RE = re.compile(r"```(?:python|py)?\n(.*?)```", re.S)
+CODE_BLOCK_RE = re.compile(r"```(\w+)?\n(.*?)```", re.S)
 
 
 def extract_code(text):
-    """Return the last fenced code block (models put final code last)."""
-    blocks = CODE_BLOCK_RE.findall(text)
-    return blocks[-1] if blocks else None
+    """Pick the code block most likely to be the solution.
+
+    Prefer the last ```python/```py block — models label their final answer and
+    put it last. Only if nothing is python-tagged do we fall back to the largest
+    block, which dodges the common failure where an answer *ends* with a short
+    untagged example-usage or sample-output fence that the old "last block wins"
+    rule would have run as the solution. Returns None if there are no blocks.
+    """
+    blocks = CODE_BLOCK_RE.findall(text)  # [(lang, body), ...]
+    if not blocks:
+        return None
+    python = [body for lang, body in blocks if (lang or "").lower() in ("python", "py")]
+    if python:
+        return python[-1]
+    return max((body for _, body in blocks), key=len)
 
 
 # ---------------------------------------------------------------- llm rubric

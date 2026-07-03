@@ -252,7 +252,7 @@ other checkers; leaf nodes test the response.
 
 | type | fields | passes when |
 |---|---|---|
-| `python_tests` | `test_code`, `timeout_s` | the **last** fenced code block in the response is saved as `solution.py` and `test_code` (which imports it) exits 0 |
+| `python_tests` | `test_code`, `timeout_s` | the response's solution block (last ` ```python ` block, else the largest block) is saved as `solution.py` and `test_code` (which imports it) exits 0 |
 | `regex` | `pattern`, optional `label` | pattern matches the response (add `(?i)` for case-insensitive; the whole response is searched with `re.S`) |
 | `contains` | `value` or `values` | all strings appear in the response (case-insensitive) |
 | `not_contains` | `value` or `values` | none of the strings appear (case-insensitive) — for constraint violations and negative controls |
