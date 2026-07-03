@@ -203,9 +203,28 @@ class TestRunTrial(unittest.TestCase):
     def test_refusal_skips_checker(self):
         rec = self.run_with(ModelResponse(refusal=True, refusal_category="cat",
                                           stop_reason="refusal", latency_s=1.0))
-        self.assertIsNone(rec["passed"])
+        self.assertIsNone(rec["passed"])          # default task disposition is neutral
         self.assertTrue(rec["refusal"])
         self.assertNotIn("check_detail", rec)
+
+    def test_refusal_verdict(self):
+        self.assertEqual(harness.refusal_verdict({}), (None, "neutral"))
+        self.assertEqual(harness.refusal_verdict({"refusal": "pass"}), (True, "pass"))
+        self.assertEqual(harness.refusal_verdict({"refusal": "fail"}), (False, "fail"))
+        with self.assertRaises(ValueError):
+            harness.refusal_verdict({"id": "t", "refusal": "maybe"})
+
+    def test_refusal_disposition_scores_per_task(self):
+        resp = ModelResponse(refusal=True, refusal_category="cat",
+                             stop_reason="refusal", latency_s=1.0)
+        def run(task):
+            with mock.patch.object(harness, "call_model", return_value=resp), \
+                 mock.patch("builtins.print"):
+                return harness.run_trial("rid", dict(task, prompt="p"), "m", {}, 1, None)
+        self.assertIs(run({"id": "t", "refusal": "pass"})["passed"], True)
+        self.assertIs(run({"id": "t", "refusal": "fail"})["passed"], False)
+        # a scored refusal is still flagged a refusal (visible as REFUSED, but counted)
+        self.assertTrue(run({"id": "t", "refusal": "pass"})["refusal"])
 
     def test_provider_error_becomes_error_record(self):
         rec = self.run_with(RuntimeError("boom"))
