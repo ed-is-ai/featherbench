@@ -26,6 +26,7 @@ WARNING: tasks with a "python_tests" checker EXECUTE model-generated code
 locally. Run this harness on an isolated machine (see README).
 """
 import argparse
+import concurrent.futures
 import hashlib
 import html
 import itertools
@@ -971,6 +972,30 @@ def run_trial(run_id, task, model_name, cfg, trial, judges):
     return record
 
 
+def run_all_trials(work, run_id, judges, writer, concurrency):
+    """Run each (task, (model, cfg), trial) work-item and hand every result to
+    writer(record). run_trial never raises, so writer is always called once per
+    item.
+
+    With concurrency > 1 the trials run in a thread pool, but writer is invoked
+    only on the calling thread (as each future completes), so it needs no lock
+    and each record still lands the moment its trial finishes — a mid-run crash
+    keeps everything already done. Order is completion order, not submission
+    order; records carry task/model/trial so that doesn't matter.
+    """
+    def one(item):
+        task, (model_name, cfg), trial = item
+        return run_trial(run_id, task, model_name, cfg, trial, judges)
+
+    if concurrency > 1:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=concurrency) as ex:
+            for fut in concurrent.futures.as_completed([ex.submit(one, it) for it in work]):
+                writer(fut.result())
+    else:
+        for item in work:
+            writer(one(item))
+
+
 def parse_args():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -981,6 +1006,10 @@ def parse_args():
     ap.add_argument("--categories", help="comma-separated task categories to run, e.g. "
                     "coding,security (default: all). Combines with --tasks as an intersection.")
     ap.add_argument("--trials", type=int, default=1, help="trials per (task, model)")
+    ap.add_argument("--concurrency", type=int, default=1, metavar="N",
+                    help="run N trials in parallel (default 1, serial). Speeds up large "
+                    "runs, but concurrent requests can inflate each other's measured "
+                    "latency — keep it at 1 when latency is a reported metric.")
     ap.add_argument("--no-rubric", action="store_true",
                     help="skip LLM rubric judging even on tasks that define a rubric")
     ap.add_argument("--dry-run", action="store_true", help="list what would run, then exit")
@@ -994,13 +1023,16 @@ def main():
     tasks = select_tasks(args.tasks, args.categories)
     if not models or not tasks:
         sys.exit(f"nothing to run: {len(models)} models, {len(tasks)} tasks selected")
+    if args.concurrency < 1:
+        sys.exit("--concurrency must be >= 1")
     for t in tasks:  # fail fast on a bad "refusal" disposition, not mid-run
         try:
             refusal_verdict(t)
         except ValueError as e:
             sys.exit(str(e))
 
-    print(f"Running {len(tasks)} task(s) x {len(models)} model(s) x {args.trials} trial(s)")
+    conc = f", {args.concurrency}-way parallel" if args.concurrency > 1 else ""
+    print(f"Running {len(tasks)} task(s) x {len(models)} model(s) x {args.trials} trial(s){conc}")
     if args.dry_run:
         for t in tasks:
             print("  task:", t["id"], f"[{t.get('category', 'uncategorized')}]")
@@ -1013,12 +1045,12 @@ def main():
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     judges = None if args.no_rubric else models
 
+    work = list(itertools.product(tasks, models.items(), range(1, args.trials + 1)))
     with results_file.open("a") as out:
-        for task, (model_name, cfg), trial in itertools.product(
-                tasks, models.items(), range(1, args.trials + 1)):
-            record = run_trial(run_id, task, model_name, cfg, trial, judges)
+        def writer(record):
             out.write(json.dumps(record) + "\n")
             out.flush()
+        run_all_trials(work, run_id, judges, writer, args.concurrency)
 
     all_records = [json.loads(line) for line in results_file.read_text().splitlines() if line.strip()]
     write_summary(all_records)

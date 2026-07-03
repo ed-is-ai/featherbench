@@ -325,5 +325,26 @@ class TestRunTrial(unittest.TestCase):
         self.assertIsNone(rec["passed"])
 
 
+class TestRunAllTrials(unittest.TestCase):
+    WORK = [(f"task{i}", ("m", {}), 1) for i in range(6)]
+
+    def _run(self, concurrency):
+        written = []
+        def stub(run_id, task, model, cfg, trial, judges):
+            return {"task": task, "model": model, "trial": trial}
+        with mock.patch.object(harness, "run_trial", side_effect=stub):
+            harness.run_all_trials(self.WORK, "rid", None, written.append, concurrency)
+        return written
+
+    def test_serial_covers_every_workitem(self):
+        written = self._run(concurrency=1)
+        self.assertEqual([w["task"] for w in written], [f"task{i}" for i in range(6)])
+
+    def test_parallel_covers_every_workitem(self):
+        written = self._run(concurrency=3)  # order may differ, coverage must not
+        self.assertEqual({w["task"] for w in written}, {f"task{i}" for i in range(6)})
+        self.assertEqual(len(written), 6)
+
+
 if __name__ == "__main__":
     unittest.main()
