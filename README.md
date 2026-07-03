@@ -50,6 +50,22 @@ export GLM_API_KEY=...
 You only need keys for the providers you actually run. A run that selects only
 Anthropic models needs only `ANTHROPIC_API_KEY`.
 
+**Where the keys live.** They are read from these environment variables and
+nowhere else — no key is stored in the repo, in `models.json`, or on disk. The
+SDK clients pick them up when a provider is called ([`call_anthropic`](eval.py),
+[`call_openai_*`](eval.py); the GLM key is named by `api_key_env` in
+`models.json`). Two consequences worth knowing:
+
+- **The `python_tests` checker never sees your keys.** It runs model-generated
+  code in a subprocess with a stripped environment (`PATH` only), so a task
+  answer cannot read `ANTHROPIC_API_KEY` and exfiltrate it. This is enforced in
+  code, independent of any sandbox.
+- **Keep them out of your interactive shell if you can.** `export` leaves a key
+  visible to other processes running as you (`env`, `ps e`). To scope a key to a
+  single run, prefix the command instead:
+  `ANTHROPIC_API_KEY=sk-ant-... python3 eval.py`. Under nono, keys pass through
+  from the launching shell by default — see [the sandbox section](#-run-this-on-a-sandboxed-machine).
+
 ### Models
 
 [`models.json`](models.json) is a catalog of selectable models across three
@@ -99,9 +115,18 @@ nono run --allow . \
   --allow-domain api.openai.com \
   --allow-domain api.z.ai \
   -- python3 eval.py
-``` Run the harness on an isolated
-machine (or containerise the checker — see [Extension points](#extension-points)),
-not on a machine with personal data or broad credentials.
+```
+
+nono passes your `ANTHROPIC_API_KEY` etc. through from the launching shell, so
+the harness can still authenticate; the sandbox's job is to stop model-generated
+code from reaching your files or the network, not to hide the keys the harness
+itself needs. To avoid keys living in your interactive shell at all, prefix them
+on the nono command (`ANTHROPIC_API_KEY=sk-ant-... nono run ... -- python3
+eval.py`).
+
+If you'd rather not use a sandbox, run the harness on an isolated machine (or
+containerise the checker — see [Extension points](#extension-points)), not on a
+machine with personal data or broad credentials.
 
 ## Usage
 
