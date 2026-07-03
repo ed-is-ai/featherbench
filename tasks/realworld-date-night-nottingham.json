@@ -1,5 +1,6 @@
 {
-  "id": "date-night-nottingham",
+  "id": "realworld-date-night-nottingham",
+  "category": "realworld",
   "description": "Local-knowledge task with hallucination risk — models may invent venues or recommend closed ones. Checkable floor: five distinct ideas, genuinely Nottingham-specific references, costs given, the budget constraint acknowledged, and a caveat to check/book ahead (venue info in training data goes stale). Whether the named venues actually exist and are still open: verify manually from results.jsonl — that is the interesting comparison.",
   "prompt": "My wife and I live in Nottingham and have a babysitter booked for Saturday evening. Give me 5 date night ideas — we've done cinema-and-pizza to death. Requirements: at least one idea involving food, at least one that's active or outdoors, and at least one budget option under £30 total for both of us. Number the ideas 1 to 5, give a rough cost for each, and be specific to Nottingham — actual places and areas, not generic suggestions.",
   "checker": {

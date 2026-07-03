@@ -1,0 +1,69 @@
+{
+  "id": "data-model-from-interview",
+  "category": "data",
+  "description": "Analyst deliverable: turn a stakeholder interview into (1) a dimensional (star-schema) data model and (2) a numbered list of functional requirements. The transcript is authored here, so grounding is checkable: the grain is a receipt line item; the fact carries units/revenue/discount; dimensions include date, store (with region + format), product (with category), promotion, and a loyalty/member flag; returns must be modelled separately from gross sales. Deterministic floor: a fact table and stated grain, the core dimensions, numbered requirements, and grounding in transcript-specific concepts (promotions, returns, loyalty). Rubric judges modelling quality and requirement testability.",
+  "prompt": "Below is an interview transcript with the Head of Retail Operations. From it, produce two things:\n\n1. A DIMENSIONAL DATA MODEL (star schema): name the fact table(s) and state the grain explicitly, then list the dimension tables with their key attributes. Call out any measures, and note where returns and promotions fit.\n2. A NUMBERED LIST OF FUNCTIONAL REQUIREMENTS derived from what she actually asked for — each one specific and testable.\n\nUse only what the transcript supports; don't invent scope she didn't mention.\n\n[Interview transcript — stakeholder: Priya, Head of Retail Operations. Interviewer: analytics team.]\n\nINTERVIEWER: Thanks for the time. In your words, what do you wish you could see that you can't today?\nPRIYA: Honestly, the big one is sales performance I can actually trust and slice. Right now I get a spreadsheet emailed every Monday with last week's sales by store, and that's it. I can't break it down by product category, I can't compare regions, and I can't look at a single day when something odd happens.\nINTERVIEWER: When you say sales, at what level do you think about it?\nPRIYA: Down to the individual line on a receipt, ideally. Each transaction has several items, each item has a quantity and the price it actually sold at after any discount. I care about units sold and revenue, and I care about discount given because promotions are a black hole for us.\nINTERVIEWER: Tell me about promotions.\nPRIYA: We run promotions — buy-one-get-one, percentage off a category, that sort of thing — and nobody can tell me afterwards whether they actually lifted sales or just gave away margin. I'd want to compare sales for a category during a promotion window versus a comparable normal period.\nINTERVIEWER: What about stores and geography?\nPRIYA: Every store belongs to a region, and regions roll up to the whole estate. Stores also have a format — high street, retail park, concession. I'd want to compare like-for-like, so format matters.\nINTERVIEWER: You mentioned odd days. What else moves the numbers?\nPRIYA: Returns, definitely. A big return can wipe out a day and right now it's invisible — returns are just netted off somewhere. I'd want to see gross sales, returns, and net separately. And loyalty — about 40% of transactions are from loyalty members, and I suspect they behave very differently, but I can't segment by member versus guest.\nINTERVIEWER: Time-wise, how far back and how fresh?\nPRIYA: Three years of history for trends, and I'd be happy with a daily refresh — I don't need real-time. But I do need to compare the same period year on year, and week on week, including handling that some weeks span a month boundary.\nINTERVIEWER: If you could only have three things at launch?\nPRIYA: Sales by store, region and product category over any date range; promotion effectiveness versus a baseline; and returns visible separately from gross sales. Loyalty segmentation would be the cherry on top.",
+  "checker": {
+    "type": "all",
+    "checks": [
+      {
+        "type": "regex",
+        "pattern": "(?i)\\bfact\\b",
+        "label": "names a fact table"
+      },
+      {
+        "type": "regex",
+        "pattern": "(?i)(grain|granularity|one row per|lowest level)",
+        "label": "states the grain"
+      },
+      {
+        "type": "contains",
+        "values": [
+          "date",
+          "store",
+          "product"
+        ],
+        "label": "core dimensions present"
+      },
+      {
+        "type": "regex",
+        "pattern": "(?i)(region)",
+        "label": "captures region (store hierarchy)"
+      },
+      {
+        "type": "regex",
+        "pattern": "(?i)(categor)",
+        "label": "captures product category"
+      },
+      {
+        "type": "regex",
+        "pattern": "(?i)(promotion|promo)",
+        "label": "models promotions (from transcript)"
+      },
+      {
+        "type": "regex",
+        "pattern": "(?i)(return)",
+        "label": "models returns separately (from transcript)"
+      },
+      {
+        "type": "regex",
+        "pattern": "(?i)(loyalty|member)",
+        "label": "captures loyalty/member segmentation (from transcript)"
+      },
+      {
+        "type": "regex",
+        "pattern": "(?sm)^[#*\\s>-]*1[\\.\\)].*^[#*\\s>-]*2[\\.\\)].*^[#*\\s>-]*3[\\.\\)]",
+        "label": "at least three numbered functional requirements"
+      }
+    ]
+  },
+  "rubric": {
+    "criteria": [
+      "Grain is correct and explicit: one row per receipt line item (not per transaction or per day)",
+      "Fact carries the right measures (units, revenue/sales amount, discount) and separates gross sales, returns and net",
+      "Dimensions are well chosen and conformed: date, store (with region hierarchy and format), product (with category), promotion, loyalty/member",
+      "Functional requirements trace directly to the transcript (slice by store/region/category over any range, promotion vs baseline, returns visible, YoY/WoW incl. month-boundary weeks) and are testable",
+      "Does not invent scope the stakeholder never asked for, and flags the daily-refresh / 3-year-history expectations"
+    ]
+  }
+}

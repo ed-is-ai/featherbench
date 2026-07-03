@@ -1,0 +1,68 @@
+{
+  "id": "data-csv-mapping-customer",
+  "category": "data",
+  "description": "Data-engineering deliverable: a field-level mapping between two schemas. Source is a raw CRM customer export; target is a conformed warehouse dim_customer. The interesting work is the non-trivial mappings: first_nm+last_nm concatenated into full_name, dob reformatted DD/MM/YYYY -> ISO, gender_cd value-mapped (M/F/U -> Male/Female/Unknown), and signup_ts (Unix epoch) converted to a date. Deterministic floor: every source and target field is addressed and the four transformations are described. Rubric judges correctness/completeness of the actual mapping. Note the output is CSV/tabular text, not a python_tests block.",
+  "prompt": "Produce a field-level mapping between these two schemas so an engineer can build the load.\n\nSOURCE (raw CRM export, one row per customer):\n- cust_id       (string, e.g. \"C0001\")\n- first_nm      (string)\n- last_nm       (string)\n- dob           (string, formatted DD/MM/YYYY)\n- gender_cd     (string, one of M / F / U)\n- email_addr    (string, mixed case)\n- signup_ts     (integer, Unix epoch seconds)\n\nTARGET (warehouse dim_customer):\n- customer_id   (string, business key)\n- full_name     (string)\n- date_of_birth (date, ISO YYYY-MM-DD)\n- gender        (string, one of Male / Female / Unknown)\n- email         (string, lowercased)\n- signup_date   (date, ISO YYYY-MM-DD)\n\nGive the mapping as CSV with the columns: source_field,target_field,transformation,notes. One row per mapping. Where a target field is derived from more than one source field, make that explicit. Describe every transformation precisely enough to implement (date reformats, the gender value map, the email normalisation, the epoch conversion, and the name concatenation).",
+  "checker": {
+    "type": "all",
+    "checks": [
+      {
+        "type": "contains",
+        "values": [
+          "customer_id",
+          "full_name",
+          "date_of_birth",
+          "gender",
+          "email",
+          "signup_date"
+        ],
+        "label": "addresses every target field"
+      },
+      {
+        "type": "contains",
+        "values": [
+          "cust_id",
+          "first_nm",
+          "last_nm",
+          "dob",
+          "gender_cd",
+          "email_addr",
+          "signup_ts"
+        ],
+        "label": "addresses every source field"
+      },
+      {
+        "type": "regex",
+        "pattern": "(?i)(yyyy-mm-dd|iso[- ]?8601|%Y-%m-%d)",
+        "label": "specifies the ISO date reformat"
+      },
+      {
+        "type": "contains",
+        "values": [
+          "Male",
+          "Female"
+        ],
+        "label": "gives the gender value map (M->Male, F->Female)"
+      },
+      {
+        "type": "regex",
+        "pattern": "(?i)(concat|first_nm[^\\n]{0,40}last_nm|last_nm[^\\n]{0,40}first_nm|first name[^\\n]{0,40}last name)",
+        "label": "describes the full_name concatenation"
+      },
+      {
+        "type": "regex",
+        "pattern": "(?i)(epoch|unix|from_?unixtime|to_?timestamp)",
+        "label": "describes the epoch->date conversion"
+      }
+    ]
+  },
+  "rubric": {
+    "criteria": [
+      "Every target field is mapped from the correct source field(s); no target left unexplained",
+      "Transformations are correct and implementable: DD/MM/YYYY -> ISO, M/F/U -> Male/Female/Unknown, email lowercased, Unix epoch -> date",
+      "full_name derivation from first_nm + last_nm is explicit (both source fields referenced)",
+      "Handles edge cases sensibly (unknown/blank gender, null dob or email, epoch in seconds vs milliseconds)",
+      "Clean, unambiguous CSV that an engineer could implement without follow-up questions"
+    ]
+  }
+}

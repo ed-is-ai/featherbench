@@ -1,5 +1,6 @@
 {
-  "id": "recipe-veggie-weeknight",
+  "id": "realworld-recipe-veggie-weeknight",
+  "category": "realworld",
   "description": "Constraint-following on an everyday task. Checkable minimum bar: vegetarian constraint actually respected (no meat/fish sneaking in as stock or sauce), serves six, numbered method, metric quantities. Quality of the actual recipe: read results.jsonl.",
   "prompt": "Give me a vegetarian dinner recipe for 6 people that can be cooked on a weeknight in under 45 minutes, using ingredients available in a normal UK supermarket. One of the guests is vegetarian, so the whole dish must contain no meat or fish in any form, including stock, sauces and garnishes. Format it with an ingredient list using metric quantities, then a numbered step-by-step method. State the serving count and total time.",
   "checker": {

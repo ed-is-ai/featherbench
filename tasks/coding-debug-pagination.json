@@ -1,0 +1,11 @@
+{
+  "id": "coding-debug-pagination",
+  "category": "coding",
+  "description": "Debugging an off-by-one pagination bug. Computing the page count with floor division (`len // page_size`) drops the final partial page and returns nothing when there are fewer items than a page. Correct behaviour: every item appears exactly once, the last page may be shorter, and an empty input yields no pages. Tests cover the dropped-partial-page case, the exact-fit case (must not regress), the smaller-than-one-page case, and empty input.",
+  "prompt": "This splits a list of items into fixed-size pages, but the last page keeps going missing:\n\n```python\ndef paginate(items, page_size):\n    pages = []\n    num_pages = len(items) // page_size\n    for i in range(num_pages):\n        pages.append(items[i * page_size:(i + 1) * page_size])\n    return pages\n```\n\nObserved:\n\n```\n>>> paginate([1, 2, 3, 4, 5], 2)\n[[1, 2], [3, 4]]     # the [5] page is missing\n>>> paginate([1, 2, 3], 5)\n[]                    # expected [[1, 2, 3]]\n```\n\nFix it. Intended behaviour: return a list of pages of at most `page_size` items covering every item in order; the final page may be smaller; an empty `items` returns `[]`. Keep the name and signature, use only the standard library, and give the final code in a single Python code block.",
+  "checker": {
+    "type": "python_tests",
+    "timeout_s": 20,
+    "test_code": "from solution import paginate\nassert paginate([1, 2, 3, 4, 5], 2) == [[1, 2], [3, 4], [5]]\nassert paginate([1, 2, 3, 4], 2) == [[1, 2], [3, 4]]\nassert paginate([1, 2, 3], 5) == [[1, 2, 3]]\nassert paginate([], 3) == []\nassert paginate([1, 2, 3, 4, 5, 6], 3) == [[1, 2, 3], [4, 5, 6]]\nassert paginate(['a', 'b', 'c'], 1) == [['a'], ['b'], ['c']]\nprint('OK')\n"
+  }
+}

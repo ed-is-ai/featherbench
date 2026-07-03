@@ -1,5 +1,6 @@
 {
-  "id": "holiday-plan-lisbon",
+  "id": "realworld-holiday-plan-lisbon",
+  "category": "realworld",
   "description": "Multi-constraint planning. Checkable minimum bar: all five days present as day-by-day structure, costs engaged with (currency amounts appear), child-suitability addressed, and the stated rest-day constraint respected in structure. Itinerary quality (realistic pacing, geography, opening days): read results.jsonl.",
   "prompt": "Plan a 5-day holiday to Lisbon in October for two adults and a 6-year-old. Budget is £1,500 for everything except flights. We want a mix of sights and downtime — the middle day (Day 3) must be a low-key rest day with nothing scheduled before noon. The 6-year-old cannot walk more than about 3 miles in a day. Give a day-by-day itinerary with headings 'Day 1' through 'Day 5', a rough cost estimate per day, and a total against the budget.",
   "checker": {

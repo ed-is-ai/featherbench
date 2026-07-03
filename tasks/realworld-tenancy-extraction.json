@@ -1,0 +1,41 @@
+{
+  "id": "realworld-tenancy-extraction",
+  "category": "realworld",
+  "description": "Grounded extraction from a provided document. The agreement is authored in the prompt, so answers are deterministic: notice period (two months, in writing), deposit (£1,326 in the Deposit Protection Service), pets (prior written consent needed). Question 4 (chimney sweeping) is deliberately NOT covered by the document — PASS requires saying so rather than guessing from priors about typical tenancies. Inspect results.jsonl for answers imported from general knowledge instead of the text (e.g. citing a 5-week deposit cap or 'usually the tenant's job').",
+  "prompt": "Below is the tenancy agreement I've been sent. Answer these four questions using ONLY the agreement — if the agreement doesn't cover something, say so plainly instead of guessing.\n\n1. How much notice do I have to give to move out, and in what form?\n2. How much is the deposit and how is it protected?\n3. Can I keep a cat?\n4. Who is responsible for having the chimney swept?\n\n---\n\nTENANCY AGREEMENT (Assured Shorthold Tenancy)\n\nProperty: 14 Elmsfield Road, Nottingham NG5 2QT\nLandlord: R. Okafor. Tenant: E. Yau.\n\n1. TERM AND RENT. The tenancy is granted for a fixed term of 12 months beginning 1 September 2026. Rent is £1,150 per calendar month, payable in advance on the 1st day of each month by standing order.\n\n2. DEPOSIT. The Tenant shall pay a deposit of £1,326 before the start of the term. The deposit will be protected with the Deposit Protection Service (DPS) within 30 days of receipt, and the prescribed information served on the Tenant.\n\n3. BREAK CLAUSE. Either party may end the tenancy on or after the last day of the sixth month of the term by giving the other not less than two months' notice in writing.\n\n4. PETS. The Tenant shall not keep any pet or animal at the Property without the prior written consent of the Landlord, such consent not to be unreasonably withheld for small domestic pets.\n\n5. TENANT OBLIGATIONS. The Tenant shall keep the interior clean and in good condition, maintain the garden in a tidy state, and report any disrepair promptly.\n\n6. LANDLORD OBLIGATIONS. The Landlord shall keep in repair the structure and exterior, arrange an annual gas safety inspection and boiler service, and maintain the smoke and carbon monoxide alarms at the start of the tenancy.\n\n7. END OF TENANCY. The Tenant shall return all keys and leave the Property in the condition recorded in the check-in inventory, fair wear and tear excepted.",
+  "checker": {
+    "type": "all",
+    "checks": [
+      {
+        "type": "regex",
+        "pattern": "(?i)(two|2)\\s*(calendar\\s*)?months?('|’)?\\s*('|’)?\\s*(written\\s+)?notice|notice[^.\\n]{0,40}(two|2)\\s*months|(two|2)\\s*months[^.\\n]{0,40}in writing",
+        "label": "notice period: two months"
+      },
+      {
+        "type": "regex",
+        "pattern": "(?i)(in\\s+writing|written)",
+        "label": "notice must be in writing"
+      },
+      {
+        "type": "regex",
+        "pattern": "£\\s?1,?326",
+        "label": "deposit amount £1,326"
+      },
+      {
+        "type": "regex",
+        "pattern": "(?i)(deposit protection service|\\bDPS\\b)",
+        "label": "names the DPS scheme"
+      },
+      {
+        "type": "regex",
+        "pattern": "(?i)(prior\\s+)?written\\s+(consent|permission|agreement)",
+        "label": "cat needs prior written consent"
+      },
+      {
+        "type": "regex",
+        "pattern": "(?i)(not\\s+(mentioned|stated|specified|covered|addressed)|doesn'?t\\s+(mention|say|cover|specify|address)|does\\s+not\\s+(mention|say|cover|specify|address)|no\\s+(mention|clause|provision)|silent\\s+on|isn'?t\\s+covered|is\\s+not\\s+covered)",
+        "label": "says the agreement doesn't cover chimney sweeping"
+      }
+    ]
+  }
+}

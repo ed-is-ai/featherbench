@@ -1,0 +1,67 @@
+{
+  "id": "data-quality-assessment",
+  "category": "data",
+  "description": "Analyst deliverable: assess the data quality of a small table with deliberately seeded defects. Because the table is authored here, the issues are known and checkable: a duplicated primary key (C0007 appears twice), a missing email (C0005) and a malformed one (C0003, no @), a negative age (C0004 = -3) plus a blank age (C0010), inconsistent gender coding (M/Male/F/f/Female/Unknown), a future signup_date (C0006 = 2099-01-01), and a non-numeric value in a numeric column (C0008 order_total = N/A). Deterministic floor: the model must catch the headline defects and frame them by DQ dimension. Rubric judges coverage, severity/prioritisation, and remediation quality.",
+  "prompt": "Assess the data quality of the table below (it's a customer extract). Report the issues you find, grouped by data-quality dimension (e.g. completeness, validity, uniqueness, consistency, accuracy). For each issue give the affected row(s)/column, why it's a problem, a severity, and a suggested remediation. Call out anything that would break a downstream load or skew analytics.\n\n```\ncustomer_id,full_name,email,age,gender,signup_date,order_total\nC0001,Alice Adams,alice@shop.com,34,F,2023-05-01,120.50\nC0002,Bob Brown,bob@shop.com,41,Male,2022-11-15,0.00\nC0003,Priya Patel,priya.example.com,29,f,2023-01-20,88.00\nC0004,Carl Court,carl@shop.com,-3,M,2024-02-02,45.00\nC0005,Dana Diaz,,52,Female,2021-07-30,210.00\nC0006,Evan Ellis,evan@shop.com,38,M,2099-01-01,15.00\nC0007,Farah Khan,farah@shop.com,45,F,2023-03-03,60.00\nC0007,Farah Khan,farah@shop.com,45,F,2023-03-03,60.00\nC0008,Greg Green,greg@shop.com,60,Unknown,2022-09-09,N/A\nC0009,Hana Ito,hana@shop.com,27,Male,2023-08-08,33.33\nC0010,Ian Ives,ian@shop.com,,M,2020-12-12,17.00\n```",
+  "checker": {
+    "type": "all",
+    "checks": [
+      {
+        "type": "regex",
+        "pattern": "(?i)(completeness|validity|uniqueness|consistency|accuracy)",
+        "label": "frames issues by DQ dimension"
+      },
+      {
+        "type": "regex",
+        "pattern": "(?i)(duplicat|not unique|repeated)",
+        "label": "flags the duplicate key"
+      },
+      {
+        "type": "contains",
+        "values": [
+          "C0007"
+        ],
+        "label": "identifies the duplicated customer_id C0007"
+      },
+      {
+        "type": "regex",
+        "pattern": "(?i)(missing|null|blank|empty|absent)[^\\n]{0,30}(email|value)|email[^\\n]{0,30}(missing|null|blank|empty)",
+        "label": "flags the missing email (C0005)"
+      },
+      {
+        "type": "regex",
+        "pattern": "(?i)(invalid|malformed|not[^\\n]{0,10}valid)[^\\n]{0,20}email|email[^\\n]{0,30}(invalid|malformed|no.{0,5}@|missing.{0,5}@)|priya\\.example\\.com",
+        "label": "flags the malformed email (C0003)"
+      },
+      {
+        "type": "regex",
+        "pattern": "(?i)(negative|-3|invalid)[^\\n]{0,20}age|age[^\\n]{0,20}(negative|-3|invalid|out of range)",
+        "label": "flags the negative age (C0004)"
+      },
+      {
+        "type": "regex",
+        "pattern": "(?i)(inconsistent|standardi[sz]|mixed|non-?standard|varying)[^\\n]{0,40}(gender|value|categor|cas)|gender[^\\n]{0,50}(inconsistent|standardi[sz]|mixed|M/Male|Male.{0,10}M)",
+        "label": "flags inconsistent gender coding"
+      },
+      {
+        "type": "regex",
+        "pattern": "(?i)2099|future[^\\n]{0,15}date|date[^\\n]{0,15}future",
+        "label": "flags the future signup_date (C0006)"
+      },
+      {
+        "type": "regex",
+        "pattern": "(?i)N/?A|non-?numeric|not[^\\n]{0,10}numeric|order_total[^\\n]{0,40}(text|string|invalid)",
+        "label": "flags the non-numeric order_total (C0008)"
+      }
+    ]
+  },
+  "rubric": {
+    "criteria": [
+      "Catches all the seeded defects: duplicate key (C0007), missing email (C0005), malformed email (C0003), negative age (C0004) and blank age (C0010), inconsistent gender coding, future date (C0006), non-numeric order_total (C0008)",
+      "Correctly assigns issues to data-quality dimensions (completeness, validity, uniqueness, consistency, accuracy)",
+      "Assigns sensible severity / prioritisation (e.g. duplicate key and non-numeric amount are load-breaking; a single blank age is minor)",
+      "Gives concrete, correct remediation for each issue (dedupe rule, format validation, range constraint, value standardisation, type coercion / reject-on-load)",
+      "Does not raise false positives on the clean rows (e.g. does not flag the legitimate 0.00 order_total as invalid without qualification), and notes downstream/analytics impact"
+    ]
+  }
+}

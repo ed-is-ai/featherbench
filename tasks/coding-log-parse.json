@@ -1,5 +1,6 @@
 {
-  "id": "log-parse",
+  "id": "coding-log-parse",
+  "category": "coding",
   "description": "Parsing task with awkward edge cases (quoted quotes, missing fields, IPv6).",
   "prompt": "Write a Python function `parse_line(line)` that parses one line of an nginx combined-format access log and returns a dict with keys: ip, timestamp, method, path, status (int), bytes (int), referrer, user_agent. Example line:\n\n1.2.3.4 - - [03/Jul/2026:10:15:32 +0000] \"GET /blog/post/ HTTP/1.1\" 200 5123 \"https://google.com/\" \"Mozilla/5.0\"\n\nRequirements: `bytes` may be '-' in the log, in which case return 0. The request field may be malformed (no HTTP version, or empty '\"\"'); in that case set method and path to None but still parse the rest. The ip may be IPv6. referrer and user_agent are the quoted strings without their surrounding quotes; a '-' referrer stays as '-'. Return None for a line that does not match at all. Return only the final code in a single Python code block.",
   "checker": {

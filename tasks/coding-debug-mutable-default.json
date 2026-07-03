@@ -1,0 +1,11 @@
+{
+  "id": "coding-debug-mutable-default",
+  "category": "coding",
+  "description": "Debugging the classic mutable-default-argument bug. A helper meant to start a fresh list on each bare call instead accumulates across calls because the default list is created once at def time. Tests cover independent bare calls (the bug), explicit-accumulator use (must still work), and interleaving. A rewrite that regresses the explicit-list path fails. Stdlib only.",
+  "prompt": "This helper builds up a list of values. Bare calls are supposed to each return a fresh list, but in production later calls are somehow returning values from earlier calls:\n\n```python\ndef collect(value, into=[]):\n    into.append(value)\n    return into\n```\n\nObserved:\n\n```\n>>> collect(1)\n[1]\n>>> collect(2)\n[1, 2]   # expected [2]\n```\n\nFix it. Intended behaviour: a call with no `into` returns a brand-new list containing only that value; a call that passes an explicit `into` list appends to and returns that same list. Keep the name and signature shape, use only the standard library, and give the final code in a single Python code block.",
+  "checker": {
+    "type": "python_tests",
+    "timeout_s": 20,
+    "test_code": "from solution import collect\na = collect(1)\nb = collect(2)\nassert a == [1], a\nassert b == [2], b\nc = []\nassert collect(3, c) is c and c == [3], c\ncollect(4, c)\nassert c == [3, 4], c\nassert collect(9) == [9]\nassert a == [1] and b == [2], (a, b)\nprint('OK')\n"
+  }
+}

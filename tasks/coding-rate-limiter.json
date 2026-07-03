@@ -1,5 +1,6 @@
 {
-  "id": "rate-limiter",
+  "id": "coding-rate-limiter",
+  "category": "coding",
   "description": "Stateful class implementation — tests inject a fake clock, so the model must read the spec carefully.",
   "prompt": "Implement a Python class `TokenBucket(capacity, refill_rate, clock)` — a token-bucket rate limiter. `capacity` is the maximum number of tokens (the bucket starts full), `refill_rate` is tokens added per second (continuous, fractional refill), and `clock` is a zero-argument callable returning the current time in seconds (so tests can inject a fake clock). It must expose a method `allow(n=1)` that returns True and consumes n tokens if at least n tokens are available at the time of the call, otherwise returns False and consumes nothing. Tokens never exceed capacity. Return only the final code in a single Python code block.",
   "checker": {

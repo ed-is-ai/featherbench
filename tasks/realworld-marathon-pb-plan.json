@@ -1,5 +1,6 @@
 {
-  "id": "marathon-pb-plan",
+  "id": "realworld-marathon-pb-plan",
+  "category": "realworld",
   "description": "Personalised planning with embedded constraints. Checkable minimum bar: full week-by-week structure, engages with actual target pace, includes long runs, a taper and recovery weeks, and works around the fixed Tuesday club session. Physiological sanity of the progression (mileage jumps, hardest sessions placement): read results.jsonl.",
   "prompt": "Build me a marathon training plan. I'm 42, my current PB is 3:58 and I want to go under 3:45 at the Manchester Marathon, which is 16 weeks away. I currently run about 25 miles a week and can train 4 days a week at most — one of those is my running club's Tuesday evening session, which I don't want to give up. Lay the plan out week by week with headings 'Week 1' through 'Week 16', state the weekly mileage, and tell me what target race pace I need per mile.",
   "checker": {

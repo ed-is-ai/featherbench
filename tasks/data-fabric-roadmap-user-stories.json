@@ -1,0 +1,55 @@
+{
+  "id": "data-fabric-roadmap-user-stories",
+  "category": "data",
+  "description": "Delivery-planning deliverable: turn three inputs (a data catalogue, a CSV source->target mapping, and a list of functional requirements) into a phased roadmap of user stories for an analytics build on Microsoft Fabric. Good output sequences the work ingestion -> transform -> model -> report across a medallion (bronze/silver/gold) Lakehouse, writes stories in 'As a / I want / so that' form with acceptance criteria, uses real Fabric components (Lakehouse/OneLake, Dataflow Gen2 or notebooks, Data Pipelines, Semantic model, Power BI), and traces stories back to the FRs. Deterministic floor checks story format, phasing, Fabric + medallion vocabulary, and acceptance criteria. Rubric judges sequencing, traceability and Fabric-appropriateness.",
+  "prompt": "You are planning an analytics build on Microsoft Fabric. Using the three inputs below, produce a delivery ROADMAP of USER STORIES.\n\nRequirements for your answer:\n- Organise the stories into delivery phases (or sprints), sequenced so each phase builds on the last (ingestion, then transformation/modelling, then reporting).\n- Write each story in the form: \\\"As a <role>, I want <capability> so that <benefit>\\\", and give acceptance criteria for each.\n- Map the work to Microsoft Fabric components (e.g. Lakehouse/OneLake, Data Pipelines, Dataflow Gen2 or notebooks, a semantic model, Power BI) and a medallion (bronze/silver/gold) architecture.\n- Make the traceability explicit: each story should reference the functional requirement(s) it delivers.\n\n--- INPUT 1: DATA CATALOGUE (available sources):\n- pos_transactions   : receipt headers, one row per transaction (store_id, txn_ts, loyalty_id nullable, channel). ~3 yrs, daily file drop to ADLS.\n- pos_lines          : receipt lines, one row per item (txn_id, sku, qty, gross_amount, discount_amount, return_flag).\n- product_master     : sku, product_name, category, brand (weekly full extract).\n- store_master       : store_id, store_name, region, format (SCD candidate — stores re-region occasionally).\n- promotions         : promo_id, category, promo_type, start_date, end_date.\n- loyalty_members    : loyalty_id, join_date, segment.\n\n--- INPUT 2: CSV MAPPING (excerpt, source -> target dim_customer / fact_sales):\n- pos_lines.qty          -> fact_sales.units\n- pos_lines.gross_amount -> fact_sales.gross_amount\n- pos_lines.discount_amount -> fact_sales.discount_amount\n- pos_lines.return_flag  -> fact_sales.is_return\n- store_master.region    -> dim_store.region\n- product_master.category-> dim_product.category\n- promotions.promo_id    -> dim_promotion.promotion_key (date-range join on category + txn date)\n\n--- INPUT 3: FUNCTIONAL REQUIREMENTS:\nFR1. Report sales (units, gross, net) by store, region and product category over any user-selected date range.\nFR2. Show returns separately from gross sales, with net = gross - returns.\nFR3. Measure promotion effectiveness: compare category sales in a promotion window vs a comparable baseline period.\nFR4. Segment all measures by loyalty member vs guest.\nFR5. Support year-on-year and week-on-week comparison, including weeks that span a month boundary.\nFR6. Refresh daily; retain three years of history.",
+  "checker": {
+    "type": "all",
+    "checks": [
+      {
+        "type": "regex",
+        "pattern": "(?is)as an?\\b[^\\n]{2,70}\\bi want\\b[^\\n]{2,160}\\bso that\\b",
+        "label": "at least one full 'As a / I want / so that' story"
+      },
+      {
+        "type": "regex",
+        "pattern": "(?is)(as an?\\b[^\\n]{2,70}\\bi want\\b.*?){2,}",
+        "label": "more than one user story"
+      },
+      {
+        "type": "regex",
+        "pattern": "(?i)(phase|sprint|milestone)\\s*(\\d|one|two|1|2)",
+        "label": "organised into phases/sprints"
+      },
+      {
+        "type": "regex",
+        "pattern": "(?i)(lakehouse|onelake|dataflow|data pipeline|semantic model|power bi)",
+        "label": "names real Fabric components"
+      },
+      {
+        "type": "regex",
+        "pattern": "(?i)(bronze|silver|gold|medallion)",
+        "label": "uses a medallion architecture"
+      },
+      {
+        "type": "regex",
+        "pattern": "(?i)(acceptance criteria|definition of done|given[^\\n]{0,40}when[^\\n]{0,40}then)",
+        "label": "gives acceptance criteria"
+      },
+      {
+        "type": "regex",
+        "pattern": "(?i)FR\\s?\\d",
+        "label": "traces stories back to the functional requirements"
+      }
+    ]
+  },
+  "rubric": {
+    "criteria": [
+      "Phasing is logical and incremental: ingestion (bronze) -> cleanse/conform/model (silver/gold) -> semantic model + Power BI reporting, with each phase usable",
+      "Stories are well-formed (role/want/benefit), independently valuable, and carry meaningful acceptance criteria",
+      "Fabric architecture is appropriate and specific: Lakehouse/OneLake, Pipelines for orchestration/ingestion, Dataflow Gen2 or notebooks for transformation, star schema in gold, a semantic model, Power BI reports; daily refresh addressed",
+      "Traceability is real: every functional requirement (FR1-FR6) is covered by at least one story, and the store SCD / promotion date-range join from the mapping are handled",
+      "Realistic scope and ordering — foundational data plumbing before analytics, no story depending on something not yet built"
+    ]
+  }
+}

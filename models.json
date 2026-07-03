@@ -1,19 +1,123 @@
 {
   "fable-5": {
+    "enabled": true,
     "provider": "anthropic",
     "model": "claude-fable-5",
     "effort": "high",
     "max_tokens": 64000,
     "pricing_per_mtok": {"input": 10.0, "output": 50.0}
   },
+  "opus-4-8": {
+    "enabled": false,
+    "provider": "anthropic",
+    "model": "claude-opus-4-8",
+    "effort": "high",
+    "max_tokens": 64000,
+    "pricing_per_mtok": {"input": 5.0, "output": 25.0}
+  },
+  "opus-4-7": {
+    "enabled": false,
+    "provider": "anthropic",
+    "model": "claude-opus-4-7",
+    "effort": "high",
+    "max_tokens": 64000,
+    "pricing_per_mtok": {"input": 5.0, "output": 25.0}
+  },
+  "opus-4-6": {
+    "enabled": false,
+    "provider": "anthropic",
+    "model": "claude-opus-4-6",
+    "effort": "high",
+    "max_tokens": 64000,
+    "pricing_per_mtok": {"input": 5.0, "output": 25.0}
+  },
+  "opus-4-5": {
+    "enabled": false,
+    "provider": "anthropic",
+    "model": "claude-opus-4-5",
+    "effort": "high",
+    "max_tokens": 64000,
+    "pricing_per_mtok": {"input": 5.0, "output": 25.0}
+  },
+  "sonnet-5": {
+    "enabled": false,
+    "provider": "anthropic",
+    "model": "claude-sonnet-5",
+    "effort": "high",
+    "max_tokens": 64000,
+    "pricing_per_mtok": {"input": 3.0, "output": 15.0}
+  },
+  "sonnet-4-6": {
+    "enabled": false,
+    "provider": "anthropic",
+    "model": "claude-sonnet-4-6",
+    "effort": "high",
+    "max_tokens": 64000,
+    "pricing_per_mtok": {"input": 3.0, "output": 15.0}
+  },
+  "haiku-4-5": {
+    "enabled": false,
+    "provider": "anthropic",
+    "model": "claude-haiku-4-5",
+    "max_tokens": 32000,
+    "pricing_per_mtok": {"input": 1.0, "output": 5.0}
+  },
   "gpt-5.5": {
+    "enabled": true,
     "provider": "openai",
     "api": "responses",
     "model": "gpt-5.5",
     "reasoning_effort": "high",
     "pricing_per_mtok": {"input": null, "output": null}
   },
+  "gpt-5": {
+    "enabled": false,
+    "provider": "openai",
+    "api": "responses",
+    "model": "gpt-5",
+    "reasoning_effort": "high",
+    "pricing_per_mtok": {"input": null, "output": null}
+  },
+  "gpt-5-mini": {
+    "enabled": false,
+    "provider": "openai",
+    "api": "responses",
+    "model": "gpt-5-mini",
+    "reasoning_effort": "high",
+    "pricing_per_mtok": {"input": null, "output": null}
+  },
+  "o3": {
+    "enabled": false,
+    "provider": "openai",
+    "api": "responses",
+    "model": "o3",
+    "reasoning_effort": "high",
+    "pricing_per_mtok": {"input": null, "output": null}
+  },
+  "o4-mini": {
+    "enabled": false,
+    "provider": "openai",
+    "api": "responses",
+    "model": "o4-mini",
+    "reasoning_effort": "high",
+    "pricing_per_mtok": {"input": null, "output": null}
+  },
+  "gpt-4.1": {
+    "enabled": false,
+    "provider": "openai",
+    "api": "chat",
+    "model": "gpt-4.1",
+    "pricing_per_mtok": {"input": null, "output": null}
+  },
+  "gpt-4o": {
+    "enabled": false,
+    "provider": "openai",
+    "api": "chat",
+    "model": "gpt-4o",
+    "pricing_per_mtok": {"input": null, "output": null}
+  },
   "glm-5.2": {
+    "enabled": true,
     "provider": "openai_compatible",
     "api": "chat",
     "model": "glm-5.2",

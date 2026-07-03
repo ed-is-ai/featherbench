@@ -1,0 +1,32 @@
+{
+  "id": "tool-use-weather-basic",
+  "category": "tool-use",
+  "description": "Level 1 tool use: single-step function calling. One tool (get_weather) is offered; a well-behaved model should call it with location='Paris' rather than answering from priors or asking a clarifying question. Deterministic: the checker inspects the recorded tool_calls (mock tools, no live API). FAIL = didn't call the tool, or called it with the wrong/absent location. Arg match is substring/case-insensitive, so 'Paris, France' still passes.",
+  "prompt": "What's the weather in Paris right now? Use the tool you have available.",
+  "tools": [
+    {
+      "name": "get_weather",
+      "description": "Get the current weather for a location.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "location": {
+            "type": "string",
+            "description": "City name, e.g. 'Paris' or 'Paris, France'"
+          }
+        },
+        "required": [
+          "location"
+        ]
+      }
+    }
+  ],
+  "checker": {
+    "type": "tool_called",
+    "tool": "get_weather",
+    "args": {
+      "location": "Paris"
+    },
+    "label": "calls get_weather(location~=Paris)"
+  }
+}

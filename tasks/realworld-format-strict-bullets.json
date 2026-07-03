@@ -1,0 +1,28 @@
+{
+  "id": "realworld-format-strict-bullets",
+  "category": "realworld",
+  "description": "Instruction-following under awkward format constraints. The content (why a sourdough loaf failed) is easy; the test is mechanical obedience: exactly 3 dash bullets and nothing else, each starting '- Cause:', each at most 20 words, and the word 'starter' banned even though it's the natural vocabulary. Checker is fully deterministic. Common failures: preamble/closing text around the bullets, over-long bullets, and 'starter' sneaking in.",
+  "prompt": "My sourdough loaf came out dense and flat again. Tell me the three most likely causes.\n\nFormat rules — follow them exactly:\n- Your entire reply must be exactly 3 bullet points and nothing else: no title, no introduction, no closing remarks.\n- Each bullet must start with a dash and a space, then the word 'Cause:' — like this: `- Cause: ...`\n- Each bullet must be a single sentence of at most 20 words (counting 'Cause:' as a word).\n- Do not use the word 'starter' anywhere. I know what a starter is — find other wording.",
+  "checker": {
+    "type": "all",
+    "checks": [
+      {
+        "type": "regex",
+        "pattern": "\\A\\s*(?:- Cause:[^\\n]*\\n+){2}- Cause:[^\\n]*\\s*\\Z",
+        "label": "exactly 3 '- Cause:' bullets with nothing before or after"
+      },
+      {
+        "type": "regex",
+        "pattern": "\\A\\s*- Cause:(?: +\\S+){1,19} *\\n+- Cause:(?: +\\S+){1,19} *\\n+- Cause:(?: +\\S+){1,19}\\s*\\Z",
+        "label": "every bullet is at most 20 words"
+      },
+      {
+        "type": "not_contains",
+        "values": [
+          "starter"
+        ],
+        "label": "banned word 'starter' avoided"
+      }
+    ]
+  }
+}

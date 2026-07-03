@@ -1,5 +1,6 @@
 {
-  "id": "csv-dedupe",
+  "id": "coding-csv-dedupe",
+  "category": "coding",
   "description": "Small, well-specified coding task with a deterministic unit-test checker.",
   "prompt": "Write a Python function `dedupe(rows)` that takes a list of dicts (rows from a CSV) and returns a new list with duplicate rows removed. Two rows are duplicates if they have the same value for the 'email' key, compared case-insensitively and ignoring surrounding whitespace. Keep the FIRST occurrence of each email and preserve the original order. Rows missing the 'email' key are always kept. Return only the final code in a single Python code block.",
   "checker": {
