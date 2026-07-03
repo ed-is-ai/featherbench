@@ -113,6 +113,17 @@ class TestRubric(unittest.TestCase):
         # no independent judge (only the contestant scored) -> None, not the self-score
         self.assertIsNone(harness.rubric_mean({"m1": {"score": 10}}, exclude="m1"))
 
+    def test_run_rubric_caps_answer_before_judging(self):
+        task = {"prompt": "p", "rubric": {"criteria": ["c"]}}
+        seen = {}
+        def fake(name, cfg, prompt, tools=None):
+            seen["prompt"] = prompt
+            return ModelResponse(text='{"score": 5, "rationale": "r"}')
+        with mock.patch.object(harness, "call_model", side_effect=fake):
+            harness.run_rubric(task, "X" * 200_000, {"j": {}})
+        self.assertLess(len(seen["prompt"]), harness.JUDGE_ANSWER_CAP + 2000)
+        self.assertNotIn("X" * 50_000, seen["prompt"])
+
     def test_judge_once(self):
         reply = ModelResponse(text='Sure.\n{"score": 7, "rationale": "decent"}')
         with mock.patch.object(harness, "call_model", return_value=reply):

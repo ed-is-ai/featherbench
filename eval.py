@@ -407,13 +407,23 @@ Score the answer 1-10 against the rubric (10 = excellent on every criterion, \
 {{"score": <integer 1-10>, "rationale": "<one sentence>"}}"""
 
 
+JUDGE_ANSWER_CAP = 40000  # chars (~8k tokens); rubric answers are prose — this only trims runaways
+
+
 def run_rubric(task, answer, judges):
     """Every judge model scores the answer blind. Returns {judge: {score, rationale}}.
 
     Using all three contestants as judges makes judge bias measurable (the
     summary prints a judge x contestant matrix) instead of hidden behind a
     single 'neutral' judge that is actually one of the contestants.
+
+    The answer is capped at JUDGE_ANSWER_CAP before judging: a runaway response
+    would otherwise be sent in full to every judge (the record's 200k cap is
+    applied only afterwards), multiplying one bad answer into N expensive calls.
     """
+    answer = answer or ""
+    if len(answer) > JUDGE_ANSWER_CAP:
+        answer = answer[:JUDGE_ANSWER_CAP] + "\n…[answer truncated for judging]"
     criteria = "\n".join("- " + c for c in task["rubric"]["criteria"])
     prompt = JUDGE_PROMPT.format(task_prompt=task["prompt"], answer=answer, criteria=criteria)
     return {name: _judge_once(name, cfg, prompt) for name, cfg in judges.items()}
