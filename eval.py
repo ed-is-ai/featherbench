@@ -380,8 +380,17 @@ def _judge_once(judge_name, cfg, prompt):
         return {"score": None, "error": f"{type(e).__name__}: {e}"[:200]}
 
 
-def rubric_mean(scores):
-    vals = [s["score"] for s in (scores or {}).values() if s.get("score") is not None]
+def rubric_mean(scores, exclude=None):
+    """Mean rubric score, leaving out the contestant's own self-score.
+
+    Every contestant is also a judge, so a self-flattering model would inflate
+    its own headline number. Passing `exclude=<contestant>` drops the judge whose
+    name matches (the self-cell). The raw per-judge scores stay in the record, so
+    the judge-bias matrix still shows self-preference. Returns None when no
+    independent judge scored the answer (e.g. a single-model run judging itself).
+    """
+    vals = [s["score"] for judge, s in (scores or {}).items()
+            if s.get("score") is not None and judge != exclude]
     return round(sum(vals) / len(vals), 2) if vals else None
 
 
@@ -788,7 +797,8 @@ def run_trial(run_id, task, model_name, cfg, trial, judges):
             print(f"   {verdict}  ({resp.latency_s:.1f}s, {resp.output_tokens} out-tokens)")
             if task.get("rubric") and judges:
                 record["rubric"] = run_rubric(task, resp.text, judges)
-                record["rubric_mean"] = rubric_mean(record["rubric"])
+                # exclude the contestant's own self-score from its headline mean
+                record["rubric_mean"] = rubric_mean(record["rubric"], exclude=model_name)
                 grid = ", ".join(f"{j}:{s.get('score')}" for j, s in record["rubric"].items())
                 print(f"   rubric {record['rubric_mean']}  ({grid})")
         record["cost_usd"] = cost_usd(cfg, record.get("input_tokens") or 0,

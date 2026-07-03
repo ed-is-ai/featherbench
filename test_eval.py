@@ -87,6 +87,13 @@ class TestRubric(unittest.TestCase):
                                               "c": {"score": None}}), 7.5)
         self.assertIsNone(harness.rubric_mean({}))
 
+    def test_rubric_mean_excludes_self_score(self):
+        scores = {"m1": {"score": 10}, "m2": {"score": 6}, "m3": {"score": 8}}
+        # m1's own self-score of 10 is dropped from m1's headline mean
+        self.assertEqual(harness.rubric_mean(scores, exclude="m1"), 7.0)
+        # no independent judge (only the contestant scored) -> None, not the self-score
+        self.assertIsNone(harness.rubric_mean({"m1": {"score": 10}}, exclude="m1"))
+
     def test_judge_once(self):
         reply = ModelResponse(text='Sure.\n{"score": 7, "rationale": "decent"}')
         with mock.patch.object(harness, "call_model", return_value=reply):
