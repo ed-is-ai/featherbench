@@ -155,16 +155,34 @@ def run_checker(task, text):
     checker = task.get("checker")
     if not checker:
         return None, "no checker"
+    return _check(checker, text)
+
+
+def _check(checker, text):
     ctype = checker["type"]
+
+    if ctype == "all":
+        # Composite: every sub-check must pass. Failure detail names each miss.
+        results = [_check(sub, text) for sub in checker["checks"]]
+        failures = [detail for ok, detail in results if not ok]
+        return (not failures), ("; ".join(failures) if failures else "ok")
 
     if ctype == "contains":
         values = checker.get("values") or [checker["value"]]
-        missing = [v for v in values if v not in text]
+        haystack = text.lower()
+        missing = [v for v in values if v.lower() not in haystack]
         return (not missing), ("missing: %r" % missing if missing else "ok")
+
+    if ctype == "not_contains":
+        values = checker.get("values") or [checker["value"]]
+        haystack = text.lower()
+        found = [v for v in values if v.lower() in haystack]
+        return (not found), ("forbidden term present: %r" % found if found else "ok")
 
     if ctype == "regex":
         ok = re.search(checker["pattern"], text, re.S) is not None
-        return ok, ("matched" if ok else "no match for %r" % checker["pattern"])
+        label = checker.get("label", checker["pattern"])
+        return ok, ("matched" if ok else "no match: %s" % label)
 
     if ctype == "python_tests":
         code = extract_code(text)
