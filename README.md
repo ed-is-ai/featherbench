@@ -148,9 +148,12 @@ Outputs:
   reason, refusals, errors, and any rubric scores. Appends across runs; `run_id`
   groups a single invocation. This is the raw dataset — build your own analysis
   on it.
-- `results/summary.md` — aggregate table (pass rate, median latency, tokens,
-  cost per model) plus a per-task grid and, for rubric tasks, a judge-bias
-  matrix. Regenerated from the full JSONL each run. Delete `results.jsonl` to
+- `results/summary.md` — aggregate table (pass rate with a **95% Wilson
+  confidence interval**, median latency, tokens, cost per model) plus a per-task
+  grid and, for rubric tasks, a judge-bias matrix. The interval is the honest
+  read on a binary checker over few trials: a wide bracket (e.g. `67% [21–94]`
+  at three trials) means the point estimate is not yet meaningful — raise
+  `--trials`. Regenerated from the full JSONL each run. Delete `results.jsonl` to
   start fresh.
 - `results/report.html` — self-contained review page (no external assets, opens
   straight from disk). Every trial grouped under its task with pass/fail badges,

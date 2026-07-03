@@ -132,6 +132,18 @@ class TestProvidersAndSelection(unittest.TestCase):
         self.assertAlmostEqual(harness.cost_usd(cfg, 1_000_000, 100_000), 15.0)
         self.assertIsNone(harness.cost_usd({}, 1, 1))
 
+    def test_wilson_interval(self):
+        self.assertIsNone(harness.wilson_interval(0, 0))
+        lo, hi = harness.wilson_interval(1, 1)       # 1/1: wide, capped at 1.0
+        self.assertAlmostEqual(hi, 1.0)
+        self.assertLess(lo, 0.5)
+        lo, hi = harness.wilson_interval(50, 100)     # 50/100: tight and centered
+        self.assertLess(lo, 0.5)
+        self.assertGreater(hi, 0.5)
+        self.assertGreater(hi - lo, 0.15)             # still ~±10 points at n=100
+        self.assertEqual(harness.pass_rate_cell(0, 0), "—")
+        self.assertTrue(harness.pass_rate_cell(2, 3).startswith("67% ["))
+
 
 FIXTURE_RECORDS = [
     {"run_id": "r", "trial": 1, "task": "t-code", "model": "m1", "refusal": False,
@@ -158,8 +170,9 @@ class TestReports(unittest.TestCase):
     def test_summary(self):
         harness.write_summary(FIXTURE_RECORDS)
         md = (harness.RESULTS_DIR / "summary.md").read_text()
-        self.assertIn("| m1 | 2 | 1 | 0 | 1 | 0 | 100% |", md)   # pass/refusal tallies
-        self.assertIn("| m2 | 2 | 0 | 1 | 0 | 1 | 0% |", md)     # fail/error tallies
+        self.assertIn("| m1 | 2 | 1 | 0 | 1 | 0 | 100% [", md)  # pass/refusal tallies + CI
+        self.assertIn("| m2 | 2 | 0 | 1 | 0 | 1 | 0% [", md)    # fail/error tallies + CI
+        self.assertIn("Wilson interval", md)
         self.assertIn("| t-refuse | refused | — |", md)
         self.assertIn("## Judge bias matrix", md)
 

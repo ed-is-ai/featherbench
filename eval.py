@@ -29,6 +29,7 @@ import argparse
 import html
 import itertools
 import json
+import math
 import os
 import re
 import statistics
@@ -463,6 +464,31 @@ def pass_counts(rs):
     return passed, scored
 
 
+def wilson_interval(passed, n, z=1.96):
+    """95% Wilson score interval for a binomial pass rate, as (lo, hi) fractions.
+
+    Binary checkers over a handful of trials carry huge uncertainty — at n=3 the
+    interval spans ~40 points either way, which is exactly what a reader should
+    see before treating "2/3" as a real number. Returns None when n == 0.
+    """
+    if n == 0:
+        return None
+    phat = passed / n
+    denom = 1 + z**2 / n
+    center = phat + z**2 / (2 * n)
+    margin = z * math.sqrt(phat * (1 - phat) / n + z**2 / (4 * n**2))
+    return (max(0.0, (center - margin) / denom), min(1.0, (center + margin) / denom))
+
+
+def pass_rate_cell(passed, scored):
+    """Pass rate with its 95% Wilson interval, e.g. '67% [21–94]'. Denominator is
+    Pass+Fail (refusals/errors excluded), which the Pass/Fail columns make visible."""
+    if not scored:
+        return "—"
+    lo, hi = wilson_interval(passed, scored)
+    return f"{100.0 * passed / scored:.0f}% [{100 * lo:.0f}–{100 * hi:.0f}]"
+
+
 def md_table(header, rows):
     lines = ["| " + " | ".join(header) + " |", "|" + "---|" * len(header)]
     lines += ["| " + " | ".join(str(c) for c in row) + " |" for row in rows]
@@ -495,14 +521,18 @@ def _overall_section(by_model):
             model, len(rs), passed, scored - passed,
             sum(1 for r in rs if r.get("refusal")),
             sum(1 for r in rs if r.get("error")),
-            f"{100.0 * passed / scored:.0f}%" if scored else "—",
+            pass_rate_cell(passed, scored),
             f"{sum(rubs) / len(rubs):.1f}" if rubs else "—",
             f"{statistics.median(lats):.1f}" if lats else "—",
             sum(r.get("output_tokens") or 0 for r in rs),
             f"{sum(costs):.2f}" if costs else "n/a",
         ])
-    return md_table(["Model", "Trials", "Pass", "Fail", "Refusals", "Errors", "Pass rate",
-                     "Rubric /10", "Median latency (s)", "Total out-tokens", "Cost (USD)"], rows)
+    header = ["Model", "Trials", "Pass", "Fail", "Refusals", "Errors", "Pass rate (95% CI)",
+              "Rubric /10", "Median latency (s)", "Total out-tokens", "Cost (USD)"]
+    return md_table(header, rows) + [
+        "", "Pass rate is over Pass+Fail (refusals and errors excluded); the "
+        "bracket is the 95% Wilson interval. Wide intervals mean too few trials "
+        "to conclude anything — raise `--trials`."]
 
 
 def _per_task_section(records, by_model):
