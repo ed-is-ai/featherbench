@@ -277,20 +277,28 @@ def check_tool_not_called(spec, text, tool_calls):
 
 @checker("contains")
 def check_contains(spec, text, tool_calls):
-    haystack = text.lower()
-    missing = [v for v in _wanted_values(spec) if v.lower() not in haystack]
+    missing = [v for v in _wanted_values(spec) if not _value_present(spec, v, text)]
     return (not missing), (f"missing: {missing!r}" if missing else "ok")
 
 
 @checker("not_contains")
 def check_not_contains(spec, text, tool_calls):
-    haystack = text.lower()
-    found = [v for v in _wanted_values(spec) if v.lower() in haystack]
+    found = [v for v in _wanted_values(spec) if _value_present(spec, v, text)]
     return (not found), (f"forbidden term present: {found!r}" if found else "ok")
 
 
 def _wanted_values(spec):
     return spec.get("values") or [spec["value"]]
+
+
+def _value_present(spec, value, text):
+    """Whether `value` occurs in `text`. Case-insensitive substring by default;
+    "whole_word": true requires word boundaries (\\bvalue\\b), so 'kill' no longer
+    matches 'skill'. Word boundaries treat punctuation as a break, so 'meat' still
+    matches 'meat-free' — reach for a `regex` checker when you need that precision."""
+    if spec.get("whole_word"):
+        return re.search(r"\b" + re.escape(value) + r"\b", text, re.I) is not None
+    return value.lower() in text.lower()
 
 
 @checker("regex")

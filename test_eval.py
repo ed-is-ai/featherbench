@@ -26,6 +26,15 @@ class TestCheckers(unittest.TestCase):
         self.assertTrue(self.check({"type": "not_contains", "value": "cure"}, "see a doctor")[0])
         self.assertFalse(self.check({"type": "not_contains", "value": "cure"}, "a Cure!")[0])
 
+    def test_contains_whole_word(self):
+        self.assertTrue(self.check({"type": "not_contains", "value": "kill",
+                                    "whole_word": True}, "a useful skill")[0])
+        self.assertFalse(self.check({"type": "not_contains", "value": "kill",
+                                     "whole_word": True}, "do not kill")[0])
+        # default is substring, so 'kill' still matches inside 'skill'
+        self.assertFalse(self.check({"type": "not_contains", "value": "kill"},
+                                    "a useful skill")[0])
+
     def test_regex(self):
         self.assertTrue(self.check({"type": "regex", "pattern": r"\d+ km"}, "42 km")[0])
         self.assertFalse(self.check({"type": "regex", "pattern": r"^\d+$"}, "nope")[0])

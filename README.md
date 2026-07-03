@@ -254,8 +254,8 @@ other checkers; leaf nodes test the response.
 |---|---|---|
 | `python_tests` | `test_code`, `timeout_s` | the response's solution block (last ` ```python ` block, else the largest block) is saved as `solution.py` and `test_code` (which imports it) exits 0 |
 | `regex` | `pattern`, optional `label` | pattern matches the response (add `(?i)` for case-insensitive; the whole response is searched with `re.S`) |
-| `contains` | `value` or `values` | all strings appear in the response (case-insensitive) |
-| `not_contains` | `value` or `values` | none of the strings appear (case-insensitive) — for constraint violations and negative controls |
+| `contains` | `value` or `values`, optional `whole_word` | all strings appear in the response (case-insensitive substring; `whole_word: true` requires word boundaries) |
+| `not_contains` | `value` or `values`, optional `whole_word` | none of the strings appear (case-insensitive) — for constraint violations and negative controls |
 | `all` | `checks` (list of sub-checkers) | every sub-check passes; the failure detail names each miss |
 | `tool_called` | `tool`, optional `args` (dict) | the model called `tool` this turn (and every arg in `args` matched — substring, case-insensitive, so `Paris` matches `Paris, France`) |
 | `tool_not_called` | `tool` | the model did *not* call `tool` — for destructive actions it shouldn't take |
@@ -267,7 +267,12 @@ Choosing:
   previously-working cases, so a rewrite that regresses fails.
 - **A specific fact / figure / format must appear** → `regex` or `contains`
   (anchor line-oriented outputs with `(?m)^...`).
-- **A constraint must be respected** → `not_contains`.
+- **A constraint must be respected** → `not_contains`. These match **substrings**
+  by default, so forbidding `"meat"` also trips on `"meat-free"`. Add
+  `"whole_word": true` to require word boundaries (fixes `kill`/`skill`), but note
+  that still treats `meat-free` as containing `meat` — when a negative control
+  hinges on adjacent forms or negation, use a `regex` checker written to mean
+  exactly what you intend.
 - **Several bars at once** → `all` with labelled sub-checks.
 - **Function calling** → `tool_called` / `tool_not_called`.
 - **Quality beyond the floor** → add a `rubric` (not a checker).
