@@ -1,0 +1,25 @@
+{
+  "fable-5": {
+    "provider": "anthropic",
+    "model": "claude-fable-5",
+    "effort": "high",
+    "max_tokens": 64000,
+    "pricing_per_mtok": {"input": 10.0, "output": 50.0}
+  },
+  "gpt-5.5": {
+    "provider": "openai",
+    "api": "responses",
+    "model": "gpt-5.5",
+    "reasoning_effort": "high",
+    "pricing_per_mtok": {"input": null, "output": null}
+  },
+  "glm-5.2": {
+    "provider": "openai_compatible",
+    "api": "chat",
+    "model": "glm-5.2",
+    "api_key_env": "GLM_API_KEY",
+    "base_url_env": "GLM_BASE_URL",
+    "default_base_url": "https://api.z.ai/api/paas/v4/",
+    "pricing_per_mtok": {"input": null, "output": null}
+  }
+}

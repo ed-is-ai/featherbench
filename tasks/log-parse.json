@@ -1,0 +1,10 @@
+{
+  "id": "log-parse",
+  "description": "Parsing task with awkward edge cases (quoted quotes, missing fields, IPv6).",
+  "prompt": "Write a Python function `parse_line(line)` that parses one line of an nginx combined-format access log and returns a dict with keys: ip, timestamp, method, path, status (int), bytes (int), referrer, user_agent. Example line:\n\n1.2.3.4 - - [03/Jul/2026:10:15:32 +0000] \"GET /blog/post/ HTTP/1.1\" 200 5123 \"https://google.com/\" \"Mozilla/5.0\"\n\nRequirements: `bytes` may be '-' in the log, in which case return 0. The request field may be malformed (no HTTP version, or empty '\"\"'); in that case set method and path to None but still parse the rest. The ip may be IPv6. referrer and user_agent are the quoted strings without their surrounding quotes; a '-' referrer stays as '-'. Return None for a line that does not match at all. Return only the final code in a single Python code block.",
+  "checker": {
+    "type": "python_tests",
+    "timeout_s": 20,
+    "test_code": "from solution import parse_line\nr = parse_line('1.2.3.4 - - [03/Jul/2026:10:15:32 +0000] \"GET /blog/post/ HTTP/1.1\" 200 5123 \"https://google.com/\" \"Mozilla/5.0\"')\nassert r[\"ip\"] == \"1.2.3.4\" and r[\"method\"] == \"GET\" and r[\"path\"] == \"/blog/post/\"\nassert r[\"status\"] == 200 and r[\"bytes\"] == 5123\nassert r[\"referrer\"] == \"https://google.com/\" and r[\"user_agent\"] == \"Mozilla/5.0\"\nr = parse_line('2001:db8::1 - - [03/Jul/2026:10:15:32 +0000] \"\" 400 - \"-\" \"curl/8.0\"')\nassert r[\"ip\"] == \"2001:db8::1\" and r[\"method\"] is None and r[\"path\"] is None\nassert r[\"status\"] == 400 and r[\"bytes\"] == 0 and r[\"referrer\"] == \"-\"\nassert parse_line(\"not a log line\") is None\nprint(\"ok\")\n"
+  }
+}
