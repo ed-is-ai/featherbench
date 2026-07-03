@@ -1,0 +1,17 @@
+{
+  "id": "marathon-pb-plan",
+  "description": "Personalised planning with embedded constraints. Checkable minimum bar: full week-by-week structure, engages with actual target pace, includes long runs, a taper and recovery weeks, and works around the fixed Tuesday club session. Physiological sanity of the progression (mileage jumps, hardest sessions placement): read results.jsonl.",
+  "prompt": "Build me a marathon training plan. I'm 42, my current PB is 3:58 and I want to go under 3:45 at the Manchester Marathon, which is 16 weeks away. I currently run about 25 miles a week and can train 4 days a week at most — one of those is my running club's Tuesday evening session, which I don't want to give up. Lay the plan out week by week with headings 'Week 1' through 'Week 16', state the weekly mileage, and tell me what target race pace I need per mile.",
+  "checker": {
+    "type": "all",
+    "checks": [
+      {"type": "regex", "pattern": "(?is)week\\s*1\\b.*week\\s*8\\b.*week\\s*16\\b", "label": "week-by-week structure through Week 16"},
+      {"type": "regex", "pattern": "(?i)\\d{1,2}:\\d{2}\\s*(min\\s*)?(/|per\\s*)?\\s*(mile|mi\\b|km)", "label": "states a concrete pace (min/mile or min/km)"},
+      {"type": "regex", "pattern": "(?i)long run", "label": "includes long runs"},
+      {"type": "regex", "pattern": "(?i)taper", "label": "includes a taper"},
+      {"type": "regex", "pattern": "(?i)(recovery|cutback|step[- ]back|down week|easy week)", "label": "includes recovery/cutback weeks"},
+      {"type": "regex", "pattern": "(?i)tuesday|club session", "label": "works around the Tuesday club session"},
+      {"type": "regex", "pattern": "(?i)\\d+\\s*(miles|mi\\b|km)", "label": "states weekly mileage"}
+    ]
+  }
+}
