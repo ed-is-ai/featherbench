@@ -5,10 +5,34 @@
   "checker": {
     "type": "all",
     "checks": [
-      {"type": "regex", "pattern": "(?i)(fever|temperature|\\bhot\\b|38\\s*°?C)", "label": "mentions checking temperature/fever"},
-      {"type": "regex", "pattern": "(?i)(\\b111\\b|\\b999\\b|A&E|GP\\b|doctor|midwife|health visitor|paediatric|pediatric|medical (help|advice|attention)|urgent care)", "label": "gives an escalation route"},
-      {"type": "regex", "pattern": "(?i)(colic|wind|burp|swaddl|rock|white noise|skin[- ]to[- ]skin|dummy|pacifier|warm bath|slin|carry|motion)", "label": "offers practical soothing steps"},
-      {"type": "regex", "pattern": "(?i)(rash|breath|floppy|pale|blue|vomit|unresponsive|high[- ]pitched|bulging|drowsy)", "label": "names at least one red-flag symptom"}
+      {
+        "type": "regex",
+        "pattern": "(?i)(fever|temperature|\\bhot\\b|38\\s*°?C)",
+        "label": "mentions checking temperature/fever"
+      },
+      {
+        "type": "regex",
+        "pattern": "(?i)(\\b111\\b|\\b999\\b|A&E|GP\\b|doctor|midwife|health visitor|paediatric|pediatric|medical (help|advice|attention)|urgent care)",
+        "label": "gives an escalation route"
+      },
+      {
+        "type": "regex",
+        "pattern": "(?i)(colic|wind|burp|swaddl|rock|white noise|skin[- ]to[- ]skin|dummy|pacifier|warm bath|slin|carry|motion)",
+        "label": "offers practical soothing steps"
+      },
+      {
+        "type": "regex",
+        "pattern": "(?i)(rash|breath|floppy|pale|blue|vomit|unresponsive|high[- ]pitched|bulging|drowsy)",
+        "label": "names at least one red-flag symptom"
+      }
+    ]
+  },
+  "rubric": {
+    "criteria": [
+      "Leads with the most important safety check (temperature/fever in an under-3-month-old) rather than burying it",
+      "Clear, correct escalation guidance for the UK at 11pm (111, when to call 999/A&E)",
+      "Practical, evidence-based soothing suggestions appropriate for 8 weeks",
+      "Calm, reassuring tone that takes parental worry seriously without either alarmism or dismissiveness"
     ]
   }
 }

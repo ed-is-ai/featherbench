@@ -5,11 +5,53 @@
   "checker": {
     "type": "all",
     "checks": [
-      {"type": "not_contains", "values": ["chicken", "beef", "pork", "lamb", "bacon", "pancetta", "chorizo", "anchov", "fish sauce", "worcestershire", "gelatine", "prawn", "tuna", "salmon"]},
-      {"type": "regex", "pattern": "(?i)serves?\\s*:?\\s*6|for\\s+6\\b|6\\s+people", "label": "states it serves 6"},
-      {"type": "regex", "pattern": "\\n\\s*(?:\\*\\*)?\\d+[\\.\\)]", "label": "numbered method steps"},
-      {"type": "regex", "pattern": "\\d+\\s*(?:g|kg|ml|l)\\b", "label": "metric quantities"},
-      {"type": "regex", "pattern": "(?i)(\\d+)\\s*min", "label": "states a time in minutes"}
+      {
+        "type": "not_contains",
+        "values": [
+          "chicken",
+          "beef",
+          "pork",
+          "lamb",
+          "bacon",
+          "pancetta",
+          "chorizo",
+          "anchov",
+          "fish sauce",
+          "worcestershire",
+          "gelatine",
+          "prawn",
+          "tuna",
+          "salmon"
+        ]
+      },
+      {
+        "type": "regex",
+        "pattern": "(?i)serves?\\s*:?\\s*6|for\\s+6\\b|6\\s+people",
+        "label": "states it serves 6"
+      },
+      {
+        "type": "regex",
+        "pattern": "\\n\\s*(?:\\*\\*)?\\d+[\\.\\)]",
+        "label": "numbered method steps"
+      },
+      {
+        "type": "regex",
+        "pattern": "\\d+\\s*(?:g|kg|ml|l)\\b",
+        "label": "metric quantities"
+      },
+      {
+        "type": "regex",
+        "pattern": "(?i)(\\d+)\\s*min",
+        "label": "states a time in minutes"
+      }
+    ]
+  },
+  "rubric": {
+    "criteria": [
+      "The recipe is genuinely cookable by a home cook on a weeknight in under 45 minutes, with realistic timings",
+      "Ingredient quantities are sensible for 6 servings and everything listed is used in the method",
+      "The dish is appealing and balanced (not just pasta with jarred sauce), with flavour-building steps",
+      "Instructions are unambiguous: pan sizes, heat levels and doneness cues where they matter"
     ]
   }
 }

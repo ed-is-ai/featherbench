@@ -91,6 +91,31 @@ The coding tasks are warm-up calibration tasks — for the blog post, replace
 them with the real engineering tasks, and run `--trials 3` or more so the
 write-up can report variance rather than single-shot results.
 
+## LLM rubric judging (cross-judged quality scores)
+
+A task may also define a top-level `"rubric"` with quality criteria that go
+beyond the pass/fail floor:
+
+```json
+"rubric": {"criteria": ["Costs are realistic for Lisbon", "Pacing suits a 6-year-old"]}
+```
+
+When a rubric is present, **all three contestant models score every response**
+blind (the judge is not told which model wrote the answer), 1–10 against the
+criteria. Records gain a `rubric` grid and a `rubric_mean`; the summary gains
+a *Rubric /10* column and a **judge bias matrix** — mean score each judge
+gives each contestant. Because every contestant also judges, self-preference
+shows up as a visible number in that matrix instead of hiding inside a single
+"neutral" judge that is secretly one of the contestants (the flaw with using
+a hosted judge service). Note the judge's *rationale* is recorded per score
+in `results.jsonl`.
+
+Cost: rubric tasks make 3 extra API calls per trial (one per judge), using
+the same model configs as generation. Skip with `--no-rubric`.
+
+All six real-life tasks ship with rubrics; the coding tasks don't need them —
+unit tests are a stronger signal.
+
 ## Methodology notes (for the write-up)
 
 - **Fable 5 refusals are recorded, not hidden.** Production Fable code should

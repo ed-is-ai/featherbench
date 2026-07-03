@@ -5,13 +5,49 @@
   "checker": {
     "type": "all",
     "checks": [
-      {"type": "regex", "pattern": "(?is)week\\s*1\\b.*week\\s*8\\b.*week\\s*16\\b", "label": "week-by-week structure through Week 16"},
-      {"type": "regex", "pattern": "(?i)\\d{1,2}:\\d{2}\\s*(min\\s*)?(/|per\\s*)?\\s*(mile|mi\\b|km)", "label": "states a concrete pace (min/mile or min/km)"},
-      {"type": "regex", "pattern": "(?i)long run", "label": "includes long runs"},
-      {"type": "regex", "pattern": "(?i)taper", "label": "includes a taper"},
-      {"type": "regex", "pattern": "(?i)(recovery|cutback|step[- ]back|down week|easy week)", "label": "includes recovery/cutback weeks"},
-      {"type": "regex", "pattern": "(?i)tuesday|club session", "label": "works around the Tuesday club session"},
-      {"type": "regex", "pattern": "(?i)\\d+\\s*(miles|mi\\b|km)", "label": "states weekly mileage"}
+      {
+        "type": "regex",
+        "pattern": "(?is)week\\s*1\\b.*week\\s*8\\b.*week\\s*16\\b",
+        "label": "week-by-week structure through Week 16"
+      },
+      {
+        "type": "regex",
+        "pattern": "(?i)\\d{1,2}:\\d{2}\\s*(min\\s*)?(/|per\\s*)?\\s*(mile|mi\\b|km)",
+        "label": "states a concrete pace (min/mile or min/km)"
+      },
+      {
+        "type": "regex",
+        "pattern": "(?i)long run",
+        "label": "includes long runs"
+      },
+      {
+        "type": "regex",
+        "pattern": "(?i)taper",
+        "label": "includes a taper"
+      },
+      {
+        "type": "regex",
+        "pattern": "(?i)(recovery|cutback|step[- ]back|down week|easy week)",
+        "label": "includes recovery/cutback weeks"
+      },
+      {
+        "type": "regex",
+        "pattern": "(?i)tuesday|club session",
+        "label": "works around the Tuesday club session"
+      },
+      {
+        "type": "regex",
+        "pattern": "(?i)\\d+\\s*(miles|mi\\b|km)",
+        "label": "states weekly mileage"
+      }
+    ]
+  },
+  "rubric": {
+    "criteria": [
+      "Training load is physiologically sensible: progresses from the stated 25 miles/week without dangerous jumps, includes cutback weeks",
+      "Race pace arithmetic is correct (sub-3:45 is about 8:34 per mile) and paces for different session types are consistent with it",
+      "Respects the constraints: 4 running days maximum with the Tuesday club session used intelligently",
+      "Sessions have purpose and variety (long runs building toward race demands, tempo/intervals, easy running easy)"
     ]
   }
 }

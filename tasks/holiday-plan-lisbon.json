@@ -5,10 +5,34 @@
   "checker": {
     "type": "all",
     "checks": [
-      {"type": "regex", "pattern": "(?is)day\\s*1.*day\\s*2.*day\\s*3.*day\\s*4.*day\\s*5", "label": "all five day headings in order"},
-      {"type": "regex", "pattern": "[£€]\\s?\\d", "label": "currency amounts present"},
-      {"type": "regex", "pattern": "(?i)total", "label": "gives a total against budget"},
-      {"type": "regex", "pattern": "(?is)day\\s*3.{0,600}?(rest|low[- ]key|relax|slow|easy|nothing|noon|late start|lie[- ]in|pool|downtime)", "label": "Day 3 respects the rest-day constraint"}
+      {
+        "type": "regex",
+        "pattern": "(?is)day\\s*1.*day\\s*2.*day\\s*3.*day\\s*4.*day\\s*5",
+        "label": "all five day headings in order"
+      },
+      {
+        "type": "regex",
+        "pattern": "[£€]\\s?\\d",
+        "label": "currency amounts present"
+      },
+      {
+        "type": "regex",
+        "pattern": "(?i)total",
+        "label": "gives a total against budget"
+      },
+      {
+        "type": "regex",
+        "pattern": "(?is)day\\s*3.{0,600}?(rest|low[- ]key|relax|slow|easy|nothing|noon|late start|lie[- ]in|pool|downtime)",
+        "label": "Day 3 respects the rest-day constraint"
+      }
+    ]
+  },
+  "rubric": {
+    "criteria": [
+      "The itinerary is geographically sensible — activities on the same day are near each other, no needless criss-crossing",
+      "Realistic for a 6-year-old: pacing, walking distances, and activities a young child would actually enjoy",
+      "Costs are plausible for Lisbon and the total genuinely fits the £1,500 budget",
+      "Specific, real places rather than generic filler; October-appropriate (weather, seasonal closures)"
     ]
   }
 }

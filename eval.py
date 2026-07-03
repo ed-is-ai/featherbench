@@ -207,6 +207,62 @@ def _check(checker, text):
     raise ValueError("unknown checker type %r" % ctype)
 
 
+# ---------------------------------------------------------------- llm rubric
+
+JUDGE_PROMPT = """You are scoring a model's answer against a rubric. You do not know \
+which model wrote it. Be strict, and use the full 1-10 scale — a 5 is a mediocre \
+answer, not a bad one.
+
+<task>
+{task_prompt}
+</task>
+
+<answer>
+{answer}
+</answer>
+
+<rubric>
+{criteria}
+</rubric>
+
+Score the answer 1-10 against the rubric (10 = excellent on every criterion, \
+1 = fails almost all of them). Reply with ONLY a JSON object, no other text:
+{{"score": <integer 1-10>, "rationale": "<one sentence>"}}"""
+
+
+def run_rubric(task, answer, judges):
+    """Every judge model scores the answer blind. Returns {judge: {score, rationale}}.
+
+    Using all three contestants as judges makes judge bias measurable (the
+    summary prints a judge x contestant matrix) instead of hidden behind a
+    single 'neutral' judge that is actually one of the contestants.
+    """
+    criteria = "\n".join("- " + c for c in task["rubric"]["criteria"])
+    prompt = JUDGE_PROMPT.format(task_prompt=task["prompt"], answer=answer, criteria=criteria)
+    scores = {}
+    for judge_name, cfg in judges.items():
+        try:
+            r = call_model(judge_name, cfg, prompt)
+            m = re.search(r"\{.*\}", r.get("text") or "", re.S)
+            if not m:
+                scores[judge_name] = {"score": None, "error": "no JSON in judge reply"}
+                continue
+            data = json.loads(m.group(0))
+            score = data.get("score")
+            scores[judge_name] = {
+                "score": int(score) if score is not None else None,
+                "rationale": str(data.get("rationale", ""))[:300],
+            }
+        except Exception as e:
+            scores[judge_name] = {"score": None, "error": ("%s: %s" % (type(e).__name__, e))[:200]}
+    return scores
+
+
+def rubric_mean(scores):
+    vals = [s["score"] for s in (scores or {}).values() if s.get("score") is not None]
+    return round(sum(vals) / len(vals), 2) if vals else None
+
+
 # ---------------------------------------------------------------- run + report
 
 def cost_usd(cfg, input_tokens, output_tokens):
@@ -235,8 +291,8 @@ def write_summary(records, models):
     lines = ["# Eval summary", "",
              "Generated %s. All models run through the same harness — scores are cross-comparable." %
              datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"), "",
-             "| Model | Trials | Pass | Fail | Refusals | Errors | Pass rate | Median latency (s) | Total out-tokens | Cost (USD) |",
-             "|---|---|---|---|---|---|---|---|---|---|"]
+             "| Model | Trials | Pass | Fail | Refusals | Errors | Pass rate | Rubric /10 | Median latency (s) | Total out-tokens | Cost (USD) |",
+             "|---|---|---|---|---|---|---|---|---|---|---|"]
     for model in sorted(by_model):
         rs = by_model[model]
         passed = sum(1 for r in rs if r.get("passed") is True)
@@ -245,13 +301,15 @@ def write_summary(records, models):
         errors = sum(1 for r in rs if r.get("error"))
         scored = passed + failed
         rate = "%.0f%%" % (100.0 * passed / scored) if scored else "—"
+        rubs = [r["rubric_mean"] for r in rs if r.get("rubric_mean") is not None]
+        rub = "%.1f" % (sum(rubs) / len(rubs)) if rubs else "—"
         lats = [r["latency_s"] for r in rs if r.get("latency_s") is not None]
         med = "%.1f" % statistics.median(lats) if lats else "—"
         out_tok = sum(r.get("output_tokens") or 0 for r in rs)
         costs = [r["cost_usd"] for r in rs if r.get("cost_usd") is not None]
         cost = "%.2f" % sum(costs) if costs else "n/a"
-        lines.append("| %s | %d | %d | %d | %d | %d | %s | %s | %s | %s |" %
-                     (model, len(rs), passed, failed, refusals, errors, rate, med, out_tok, cost))
+        lines.append("| %s | %d | %d | %d | %d | %d | %s | %s | %s | %s | %s |" %
+                     (model, len(rs), passed, failed, refusals, errors, rate, rub, med, out_tok, cost))
 
     lines += ["", "## Per task", "",
               "| Task | " + " | ".join(sorted(by_model)) + " |",
@@ -267,6 +325,28 @@ def write_summary(records, models):
             row.append("| %s " % cell)
         lines.append("".join(row) + "|")
 
+    # Judge x contestant matrix — makes self-preference visible instead of hidden.
+    cells = {}  # (judge, contestant) -> [scores]
+    for r in records:
+        for judge, s in (r.get("rubric") or {}).items():
+            if s.get("score") is not None:
+                cells.setdefault((judge, r["model"]), []).append(s["score"])
+    if cells:
+        judges = sorted({j for j, _ in cells})
+        contestants = sorted({c for _, c in cells})
+        lines += ["", "## Judge bias matrix (mean rubric score given)", "",
+                  "Rows are judges, columns are the models being scored. A judge scoring",
+                  "its own row-column cell notably higher than other judges score that",
+                  "column suggests self-preference.", "",
+                  "| Judge \\ Scored | " + " | ".join(contestants) + " |",
+                  "|---|" + "---|" * len(contestants)]
+        for judge in judges:
+            row = ["| %s " % judge]
+            for c in contestants:
+                vals = cells.get((judge, c))
+                row.append("| %.1f " % (sum(vals) / len(vals)) if vals else "| — ")
+            lines.append("".join(row) + "|")
+
     (RESULTS_DIR / "summary.md").write_text("\n".join(lines) + "\n")
 
 
@@ -275,6 +355,8 @@ def main():
     ap.add_argument("--models", help="comma-separated model keys (default: all in models.json)")
     ap.add_argument("--tasks", help="comma-separated task ids (default: all in tasks/)")
     ap.add_argument("--trials", type=int, default=1, help="trials per (task, model)")
+    ap.add_argument("--no-rubric", action="store_true",
+                    help="skip LLM rubric judging even on tasks that define a rubric")
     ap.add_argument("--dry-run", action="store_true", help="list what would run, then exit")
     args = ap.parse_args()
 
@@ -321,6 +403,12 @@ def main():
                             print("   %s  (%.1fs, %s out-tokens)" % (
                                 {True: "PASS", False: "FAIL", None: "DONE"}[passed],
                                 resp["latency_s"], resp.get("output_tokens")))
+                            if task.get("rubric") and not args.no_rubric:
+                                record["rubric"] = run_rubric(task, resp["text"], models)
+                                record["rubric_mean"] = rubric_mean(record["rubric"])
+                                grid = ", ".join("%s:%s" % (j, s.get("score"))
+                                                 for j, s in record["rubric"].items())
+                                print("   rubric %s  (%s)" % (record["rubric_mean"], grid))
                         record["cost_usd"] = cost_usd(
                             cfg, record.get("input_tokens") or 0, record.get("output_tokens") or 0)
                         # keep full text for later inspection, but cap runaway outputs
