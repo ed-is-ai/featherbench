@@ -90,6 +90,37 @@ def call_model(name, cfg, prompt, tools=None):
     return resp
 
 
+def _is_rate_limit(exc):
+    """True for provider rate-limit / 429 errors (anthropic & openai both raise a
+    RateLimitError carrying status_code 429), without importing either SDK."""
+    status = getattr(exc, "status_code", None) or getattr(
+        getattr(exc, "response", None), "status_code", None)
+    if status == 429:
+        return True
+    return "ratelimit" in type(exc).__name__.lower() or "rate limit" in str(exc).lower()
+
+
+def call_with_retry(name, cfg, prompt, tools=None, retries=4, base_delay=2.0):
+    """call_model with exponential backoff on rate-limit errors only.
+
+    A full-catalog x N-trials run reliably hits 429s; without this each becomes an
+    error record and silently thins the dataset. Non-rate-limit errors (bad
+    request, auth, provider down) are re-raised immediately — retrying them just
+    wastes time. Latency is measured per attempt inside call_model, so the
+    recorded latency_s reflects the successful call, not the waits.
+    """
+    for attempt in range(retries + 1):
+        try:
+            return call_model(name, cfg, prompt, tools)
+        except Exception as exc:
+            if attempt >= retries or not _is_rate_limit(exc):
+                raise
+            wait = base_delay * 2 ** attempt
+            print(f"   rate-limited ({type(exc).__name__}); "
+                  f"retry {attempt + 1}/{retries} in {wait:.0f}s", flush=True)
+            time.sleep(wait)
+
+
 @provider("anthropic")
 def call_anthropic(cfg, prompt, tools=None):
     """Claude Fable 5 via the official anthropic SDK.
@@ -390,7 +421,7 @@ def run_rubric(task, answer, judges):
 
 def _judge_once(judge_name, cfg, prompt):
     try:
-        reply = call_model(judge_name, cfg, prompt).text or ""
+        reply = call_with_retry(judge_name, cfg, prompt).text or ""
         m = re.search(r"\{.*\}", reply, re.S)
         if not m:
             return {"score": None, "error": "no JSON in judge reply"}
@@ -886,7 +917,7 @@ def run_trial(run_id, task, model_name, cfg, trial, judges):
               "model": model_name, "trial": trial,
               "timestamp": datetime.now(timezone.utc).isoformat()}
     try:
-        resp = call_model(model_name, cfg, task["prompt"], task.get("tools"))
+        resp = call_with_retry(model_name, cfg, task["prompt"], task.get("tools"))
         record.update(asdict(resp))
         if resp.refusal:
             passed, disp = refusal_verdict(task)

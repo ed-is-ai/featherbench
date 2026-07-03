@@ -138,6 +138,39 @@ class TestProvidersAndSelection(unittest.TestCase):
         with self.assertRaises(ValueError):
             harness.call_model("m", {"provider": "mystery"}, "hi")
 
+    def test_is_rate_limit(self):
+        class RateLimitError(Exception):
+            status_code = 429
+        self.assertTrue(harness._is_rate_limit(RateLimitError()))            # status_code 429
+        self.assertTrue(harness._is_rate_limit(Exception("Rate limit reached")))  # message fallback
+        self.assertFalse(harness._is_rate_limit(ValueError("bad request")))
+
+    def test_call_with_retry_backs_off_then_succeeds(self):
+        class RateLimitError(Exception):
+            status_code = 429
+        ok = ModelResponse(text="ok")
+        with mock.patch.object(harness, "call_model",
+                               side_effect=[RateLimitError(), RateLimitError(), ok]), \
+             mock.patch("time.sleep") as sleep, mock.patch("builtins.print"):
+            resp = harness.call_with_retry("m", {}, "p")
+        self.assertIs(resp, ok)
+        self.assertEqual(sleep.call_count, 2)
+
+    def test_call_with_retry_reraises_after_giving_up(self):
+        class RateLimitError(Exception):
+            status_code = 429
+        with mock.patch.object(harness, "call_model", side_effect=RateLimitError()), \
+             mock.patch("time.sleep"), mock.patch("builtins.print"):
+            with self.assertRaises(RateLimitError):
+                harness.call_with_retry("m", {}, "p", retries=2)
+
+    def test_call_with_retry_does_not_retry_other_errors(self):
+        with mock.patch.object(harness, "call_model", side_effect=ValueError("nope")) as cm, \
+             mock.patch("time.sleep"):
+            with self.assertRaises(ValueError):
+                harness.call_with_retry("m", {}, "p")
+        self.assertEqual(cm.call_count, 1)  # no retries on non-rate-limit errors
+
     def test_select_models(self):
         catalog = {"on": {"enabled": True}, "off": {"enabled": False}}
         self.assertEqual(set(harness.select_models(None, catalog)), {"on"})

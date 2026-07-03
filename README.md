@@ -436,6 +436,9 @@ single-shot luck.
   affect quality and cost — state them alongside any published numbers.
 - **Latency** is wall-clock for the full response; all models are called
   identically (Anthropic via streaming to avoid HTTP timeouts on long turns).
+- **Rate-limit errors are retried** with exponential backoff (429s only; other
+  errors surface immediately), so a large run isn't thinned by transient 429s.
+  The recorded latency is that of the successful attempt, not the backoff waits.
 - **Checkers are binary and automated**; the LLM rubric is the only judged
   component, and its bias is made visible rather than assumed away.
 
