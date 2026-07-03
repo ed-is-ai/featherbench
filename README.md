@@ -144,21 +144,25 @@ python3 eval.py --concurrency 8            # run 8 trials in parallel (serial by
 
 Outputs:
 
-- `results/results.jsonl` — one record per trial: full response text, pass/fail
-  with checker detail, tool calls, latency, input/output tokens, cost, stop
-  reason, refusals, errors, and any rubric scores. Appends across runs; `run_id`
-  groups a single invocation and `task_hash` fingerprints the task's
-  prompt/checker/tools. This is the raw dataset — build your own analysis on it.
-- `results/summary.md` — aggregate table (pass rate with a **95% Wilson
+Each run writes its own timestamped set of files (`<ts>` is a UTC stamp like
+`20260704T101530Z`), so editing a task's prompt or checker and re-running never
+blends old trials into the new numbers — every run stands alone:
+
+- `results/results-<ts>.jsonl` — one record per trial: full response text,
+  pass/fail with checker detail, tool calls, latency, input/output tokens, cost,
+  stop reason, refusals, errors, and any rubric scores. `run_id` matches the
+  filename stamp and `task_hash` fingerprints the task's prompt/checker/tools.
+  This is the raw dataset — build your own analysis on it.
+- `results/summary-<ts>.md` — aggregate table (pass rate with a **95% Wilson
   confidence interval**, median latency, tokens, cost per model) plus a per-task
   grid and, for rubric tasks, a judge-bias matrix. The interval is the honest
   read on a binary checker over few trials: a wide bracket (e.g. `67% [21–94]`
   at three trials) means the point estimate is not yet meaningful — raise
-  `--trials`. Regenerated from the full JSONL each run, so if you **edit a task's
-  prompt or checker and re-run, old records blend in**; the summary detects this
-  via `task_hash` and prints a "Mixed task versions" warning naming the affected
-  task ids. Delete `results.jsonl` to start fresh.
-- `results/report.html` — self-contained review page (no external assets, opens
+  `--trials` (all trials of one run land in one file). Built from just this run's
+  records; to combine several runs deliberately, concatenate their JSONL files
+  and pass them to `write_summary()`, which still warns via `task_hash` if you
+  blend more than one prompt/checker version of a task.
+- `results/report-<ts>.html` — self-contained review page (no external assets, opens
   straight from disk). Every trial grouped under its task with pass/fail badges,
   refusals, rubric scores + judge rationales, tool calls, cost/latency, and the
   full response text one click away. Filter by not-passed / fails / refusals and
@@ -377,10 +381,12 @@ The harness is meant to be forked. The common extensions and where they live:
 - **A new task field.** Fields you add to a task JSON are available on the
   `task` dict in `main()`; thread them where you need them (e.g. a per-task
   `system` prompt, a per-task `max_tokens`, a `tags` list for grouping).
-- **Custom scoring or reporting.** `results.jsonl` is the source of truth and is
-  append-only across runs — point any notebook or BI tool at it. `write_summary()`
-  and `write_html_report()` both regenerate from the full JSONL, so you can
-  restyle the report or add aggregate columns without re-running models.
+- **Custom scoring or reporting.** The per-run `results-<ts>.jsonl` files are the
+  source of truth — point any notebook or BI tool at one, or `cat` several
+  together to analyse across runs. `write_summary(records, out_path)` and
+  `write_html_report(records, tasks_by_id, out_path)` both take a plain list of
+  records, so you can regenerate or restyle a report — from one run's file or a
+  hand-picked set — without re-running models.
 - **Sandboxing model code.** Run the whole harness under
   [nono](https://github.com/nolabs-ai/nono) (see above), or wrap the
   `python_tests` subprocess in `check_python_tests()` with your container
@@ -390,7 +396,7 @@ The harness is meant to be forked. The common extensions and where they live:
   in a fixed panel, add an external judge, or change the 1–10 scale by editing
   `JUDGE_PROMPT`.
 
-The per-trial record schema (keys in `results.jsonl`) is the stable contract
+The per-trial record schema (keys in each `results-<ts>.jsonl`) is the stable contract
 between the harness and your tooling: `run_id, task, task_hash, model, trial,
 timestamp, text, tool_calls, passed, check_detail, refusal, refusal_category,
 stop_reason, latency_s, input_tokens, output_tokens, cost_usd, rubric,

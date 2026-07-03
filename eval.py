@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Cross-model eval harness: GLM-5.2 vs GPT-5.5 vs Claude Fable 5.
 
-Runs every task in tasks/ against every model in models.json, N trials each,
-records per-trial results to results/results.jsonl and writes a summary table
-to results/summary.md.
+Runs every task in tasks/ against every model in models.json, N trials each.
+Each run writes its own timestamped set of files — results/results-<ts>.jsonl,
+results/summary-<ts>.md and results/report-<ts>.html — so the reports reflect
+exactly one run and never blend stale trials from an earlier prompt or checker
+across runs.
 
 All models run through this same harness with the same prompts and the same
 checkers, so scores are directly comparable — unlike vendor-reported
@@ -19,7 +21,7 @@ Layout (one file, five layers):
     providers  — (cfg, prompt, tools) -> ModelResponse, registered by @provider
     checkers   — (spec, text, tool_calls) -> (passed, detail), registered by @checker
     rubric     — optional cross-judged LLM scoring
-    reports    — results/summary.md + results/report.html
+    reports    — per-run results/summary-<ts>.md + results/report-<ts>.html
     runner     — CLI, selection, and the task x model x trial loop
 
 WARNING: tasks with a "python_tests" checker EXECUTE model-generated code
@@ -590,8 +592,14 @@ def _mixed_hash_tasks(records):
     return {t: hs for t, hs in by_task.items() if len(hs) > 1}
 
 
-def write_summary(records):
-    """Aggregate all records (including past runs) into results/summary.md."""
+def write_summary(records, out_path=None):
+    """Aggregate one run's records into a summary markdown file.
+
+    out_path defaults to results/summary.md; the runner passes a per-run
+    results/summary-<ts>.md so runs never overwrite each other. The staleness
+    guard below still fires if a caller hands in records that span task
+    versions (e.g. several run files concatenated by hand)."""
+    out_path = out_path or (RESULTS_DIR / "summary.md")
     by_model = group_by(records, "model")
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     lines = ["# Eval summary", "",
@@ -610,7 +618,7 @@ def write_summary(records):
     lines += _per_task_section(records, by_model)
     lines += _category_section(records, by_model)
     lines += _bias_section(records)
-    (RESULTS_DIR / "summary.md").write_text("\n".join(lines) + "\n")
+    out_path.write_text("\n".join(lines) + "\n")
 
 
 def _overall_section(by_model):
@@ -775,14 +783,17 @@ document.addEventListener('DOMContentLoaded',()=>{
 """
 
 
-def write_html_report(records, tasks_by_id):
-    """Render results/report.html: a self-contained, filterable review page.
+def write_html_report(records, tasks_by_id, out_path=None):
+    """Render one run's report.html: a self-contained, filterable review page.
 
-    Addresses the 'inspect results.jsonl for ...' step every rubric-less task
+    Addresses the 'inspect the results file for ...' step every rubric-less task
     leans on — groups every trial under its task, with pass/fail, refusals,
     rubric scores + rationales, cost/latency, and the full response text one
-    click away. No external assets, so it opens straight from disk.
+    click away. No external assets, so it opens straight from disk. out_path
+    defaults to results/report.html; the runner passes a per-run
+    results/report-<ts>.html.
     """
+    out_path = out_path or (RESULTS_DIR / "report.html")
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     parts = [
         "<!doctype html><html lang='en'><head><meta charset='utf-8'>",
@@ -805,7 +816,7 @@ def write_html_report(records, tasks_by_id):
     for tid in sorted(by_task):
         parts += _task_html(tid, by_task[tid], tasks_by_id.get(tid, {}), cats)
     parts.append(f"</main><script>{REPORT_JS}</script></body></html>")
-    (RESULTS_DIR / "report.html").write_text("".join(parts))
+    out_path.write_text("".join(parts))
 
 
 def _task_html(tid, rs, task, cats):
@@ -1041,21 +1052,27 @@ def main():
         return
 
     RESULTS_DIR.mkdir(exist_ok=True)
-    results_file = RESULTS_DIR / "results.jsonl"
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    # A fresh file per run: the summary and report below are built from just this
+    # run's records, so editing a task's prompt or checker between runs can never
+    # blend old trials into the new aggregates.
+    results_file = RESULTS_DIR / f"results-{run_id}.jsonl"
+    summary_file = RESULTS_DIR / f"summary-{run_id}.md"
+    report_file = RESULTS_DIR / f"report-{run_id}.html"
     judges = None if args.no_rubric else models
 
     work = list(itertools.product(tasks, models.items(), range(1, args.trials + 1)))
-    with results_file.open("a") as out:
+    records = []
+    with results_file.open("w") as out:
         def writer(record):
             out.write(json.dumps(record) + "\n")
             out.flush()
+            records.append(record)
         run_all_trials(work, run_id, judges, writer, args.concurrency)
 
-    all_records = [json.loads(line) for line in results_file.read_text().splitlines() if line.strip()]
-    write_summary(all_records)
-    write_html_report(all_records, {t["id"]: t for t in tasks})
-    print(f"\nWrote {results_file}, {RESULTS_DIR / 'summary.md'} and {RESULTS_DIR / 'report.html'}")
+    write_summary(records, summary_file)
+    write_html_report(records, {t["id"]: t for t in tasks}, report_file)
+    print(f"\nWrote {results_file}, {summary_file} and {report_file}")
 
 
 if __name__ == "__main__":
