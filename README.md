@@ -2,6 +2,9 @@
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue.svg)](pyproject.toml)
+[![Dependencies: 2](https://img.shields.io/badge/dependencies-2-brightgreen.svg)](pyproject.toml)
+[![Single file](https://img.shields.io/badge/harness-single%20file-brightgreen.svg)](eval.py)
+[![Models via OpenRouter](https://img.shields.io/badge/models-OpenRouter-6467f2.svg)](https://openrouter.ai)
 
 **Find the cheapest, smallest, fastest model that is still good enough for _your_ workload.**
 
