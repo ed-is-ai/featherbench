@@ -30,6 +30,7 @@ locally. Run this harness on an isolated machine (see README).
 import argparse
 import base64
 import concurrent.futures
+import functools
 import hashlib
 import itertools
 import jinja2
@@ -830,30 +831,26 @@ def _bias_section(records):
 # source of truth, not markup buried in this module). It is read once and
 # INLINED into the report — both as the header logo and, base64-encoded, as the
 # favicon data: URI — so the rendered page stays a single self-contained file
-# with zero external asset requests. Loaded lazily and cached: importing eval.py
-# never needs the file; only rendering a report does.
-_REPORT_ICON_CACHE = None
-
-
+# with zero external asset requests. Loaded lazily and cached (@functools.cache):
+# importing eval.py never needs the file; only rendering a report does.
+@functools.cache
 def report_icon():
     """(svg_markup, favicon_data_uri) for the feather mark, read once from
     resources/featherbench.svg. The markup is inlined into the header; the
     base64 data: URI is the browser-tab favicon (CSS vars/links do not apply
     there). Keeping the report self-contained means the SVG is embedded, not
     linked — the separate file is the editable source, not a runtime fetch."""
-    global _REPORT_ICON_CACHE
-    if _REPORT_ICON_CACHE is None:
-        svg = (RESOURCES_DIR / "featherbench.svg").read_text().strip()
-        favicon = "data:image/svg+xml;base64," + base64.b64encode(svg.encode()).decode()
-        _REPORT_ICON_CACHE = (svg, favicon)
-    return _REPORT_ICON_CACHE
+    svg = (RESOURCES_DIR / "featherbench.svg").read_text().strip()
+    favicon = "data:image/svg+xml;base64," + base64.b64encode(svg.encode()).decode()
+    return (svg, favicon)
 
 
 # The report's markup, CSS and JS each live in resources/ as one editable source
 # of truth (report.html.j2 / report.css / report.js), same framing as
 # resources/featherbench.svg — not long blobs buried in this module. They are
-# read lazily and cached, so importing eval.py never touches them; only rendering
-# a report does. The template is one Jinja2 template rather than an f-string/
+# read lazily and cached (@functools.cache), so importing eval.py never touches
+# them; only rendering a report does. The template is one Jinja2 template rather
+# than an f-string/
 # `"".join` HTML builder: autoescape=True escapes every `{{ }}` value, so a model
 # answer containing <script>, & or " renders as text, never live markup
 # (issue #13) — no per-value manual escaping to forget. It is compiled via
@@ -864,29 +861,24 @@ def report_icon():
 # output). Static entities (&middot;, &mdash;) are literal template text and so
 # are emitted verbatim — Jinja only escapes interpolated `{{ }}` output.
 _REPORT_ENV = jinja2.Environment(autoescape=True, trim_blocks=True, lstrip_blocks=True)
-_REPORT_ASSET_CACHE = {}
-_REPORT_TMPL_CACHE = None
 
 
+@functools.cache
 def _report_asset(name):
     """Text of a first-party report asset (report.css / report.js), read once
     from resources/ and cached. Passed into the template as a `| safe` context
     var — never model output, so no escaping needed."""
-    if name not in _REPORT_ASSET_CACHE:
-        _REPORT_ASSET_CACHE[name] = (RESOURCES_DIR / name).read_text()
-    return _REPORT_ASSET_CACHE[name]
+    return (RESOURCES_DIR / name).read_text()
 
 
+@functools.cache
 def _report_template():
     """Compiled report template, read once from resources/report.html.j2 and
     cached. Compiled via _REPORT_ENV.from_string(...) so autoescape=True is
     preserved byte-for-byte — the issue #13 escape guard (do NOT switch to a
     FileSystemLoader)."""
-    global _REPORT_TMPL_CACHE
-    if _REPORT_TMPL_CACHE is None:
-        _REPORT_TMPL_CACHE = _REPORT_ENV.from_string(
-            (RESOURCES_DIR / "report.html.j2").read_text())
-    return _REPORT_TMPL_CACHE
+    return _REPORT_ENV.from_string(
+        (RESOURCES_DIR / "report.html.j2").read_text())
 
 
 def write_html_report(records, tasks_by_id, out_path=None):
