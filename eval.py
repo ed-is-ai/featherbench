@@ -1177,7 +1177,7 @@ def main():
     results_file = RESULTS_DIR / f"results-{run_id}.jsonl"
     summary_file = RESULTS_DIR / f"summary-{run_id}.md"
     report_file = RESULTS_DIR / f"report-{run_id}.html"
-    judges = None if args.no_rubric else models
+    judges = None if args.no_rubric else {k: v for k, v in models.items() if k == "fable-5"}
 
     work = list(itertools.product(tasks, models.items(), range(1, args.trials + 1)))
     # --resume / --rerun-errored: keep the already-completed cells and run only
