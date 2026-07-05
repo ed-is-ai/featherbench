@@ -835,90 +835,6 @@ def _bias_section(records):
 
 # ---------------------------------------------------------------- html report
 
-REPORT_CSS = """
-:root { --bg:#fff; --fg:#1a1a1a; --muted:#666; --card:#f6f6f7; --border:#e2e2e5;
-        --pass:#137333; --passbg:#e6f4ea; --fail:#c5221f; --failbg:#fce8e6;
-        --refuse:#b06000; --refusebg:#fef3e0; --err:#7c3aed; --errbg:#f0e9fc;
-        --accent:#1a73e8; --code:#f0f0f2; }
-@media (prefers-color-scheme: dark) {
-  :root { --bg:#16171a; --fg:#e6e6e8; --muted:#9a9aa2; --card:#1e2024; --border:#31333a;
-          --pass:#81c995; --passbg:#1e3226; --fail:#f28b82; --failbg:#3a2221;
-          --refuse:#fcc46b; --refusebg:#3a2e18; --err:#c5a3ff; --errbg:#2b2440;
-          --accent:#8ab4f8; --code:#101114; } }
-* { box-sizing:border-box; }
-body { margin:0; font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
-       background:var(--bg); color:var(--fg); }
-header { padding:20px 24px; border-bottom:1px solid var(--border); position:sticky; top:0;
-         background:var(--bg); z-index:5; }
-.brand { display:flex; align-items:center; gap:10px; margin:0 0 4px; }
-.brand svg { width:28px; height:28px; flex:none; }
-h1 { margin:0; font-size:18px; }
-.sub { color:var(--muted); font-size:13px; }
-.controls { margin-top:12px; display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
-.controls button { font:inherit; padding:5px 12px; border:1px solid var(--border); border-radius:999px;
-        background:var(--card); color:var(--fg); cursor:pointer; }
-.controls button.on { background:var(--accent); color:#fff; border-color:var(--accent); }
-.controls input { font:inherit; padding:5px 10px; border:1px solid var(--border); border-radius:6px;
-        background:var(--card); color:var(--fg); flex:1; min-width:160px; }
-main { padding:16px 24px 60px; max-width:1100px; }
-.task { margin:22px 0; }
-.task > h2 { font-size:16px; margin:0 0 2px; }
-.cat { font-size:11px; font-weight:500; padding:1px 8px; border-radius:999px; background:var(--card);
-       border:1px solid var(--border); color:var(--muted); margin-left:8px; vertical-align:middle; }
-.task-desc { color:var(--muted); font-size:12.5px; margin:0 0 6px; }
-details.prompt { margin:6px 0 12px; }
-details.prompt summary { cursor:pointer; color:var(--accent); font-size:12.5px; }
-pre { background:var(--code); border:1px solid var(--border); border-radius:8px; padding:12px;
-      overflow-x:auto; white-space:pre-wrap; word-wrap:break-word; font:12.5px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; margin:6px 0; }
-.trial { border:1px solid var(--border); border-radius:10px; padding:12px 14px; margin:10px 0; background:var(--card); }
-.trial.hidden { display:none; }
-.row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
-.badge { font-weight:600; font-size:11px; padding:2px 9px; border-radius:999px; letter-spacing:.02em; }
-.b-pass { color:var(--pass); background:var(--passbg); }
-.b-fail { color:var(--fail); background:var(--failbg); }
-.b-refuse { color:var(--refuse); background:var(--refusebg); }
-.b-err { color:var(--err); background:var(--errbg); }
-.model { font-weight:600; }
-.meta { color:var(--muted); font-size:12px; }
-.detail { font-size:12.5px; margin-top:6px; }
-.detail .k { color:var(--muted); }
-.rubric { margin-top:6px; font-size:12.5px; }
-.rubric .chip { display:inline-block; margin:2px 6px 2px 0; padding:1px 8px; border-radius:6px;
-        background:var(--bg); border:1px solid var(--border); }
-.rubric .subchip { display:inline-block; margin:0 0 0 4px; padding:0 6px; border-radius:5px;
-        font-size:11px; color:var(--muted); background:var(--card); border:1px solid var(--border); }
-.rubric .rat { color:var(--muted); font-size:12px; margin:2px 0 0 2px; }
-details.resp summary { cursor:pointer; color:var(--accent); font-size:12.5px; margin-top:6px; }
-"""
-
-REPORT_JS = """
-const q=(s,r=document)=>[...r.querySelectorAll(s)];
-let mode='all', term='';
-function apply(){
-  q('.trial').forEach(t=>{
-    const st=t.dataset.status, txt=t.dataset.text;
-    let ok = mode==='all' || (mode==='fail'&&st==='fail') ||
-             (mode==='refuse'&&st==='refuse') || (mode==='problem'&&st!=='pass');
-    if(ok && term) ok = txt.includes(term);
-    t.classList.toggle('hidden', !ok);
-  });
-  q('.task').forEach(sec=>{
-    const any=q('.trial:not(.hidden)',sec).length>0;
-    sec.style.display = any ? '' : 'none';
-  });
-}
-document.addEventListener('DOMContentLoaded',()=>{
-  q('.controls button').forEach(b=>b.onclick=()=>{
-    q('.controls button').forEach(x=>x.classList.remove('on'));
-    b.classList.add('on'); mode=b.dataset.mode; apply();
-  });
-  const inp=document.getElementById('search');
-  inp.oninput=()=>{ term=inp.value.toLowerCase(); apply(); };
-  apply();
-});
-"""
-
-
 # Project mark: the feather lives in resources/featherbench.svg (one editable
 # source of truth, not markup buried in this module). It is read once and
 # INLINED into the report — both as the header logo and, base64-encoded, as the
@@ -942,71 +858,44 @@ def report_icon():
     return _REPORT_ICON_CACHE
 
 
-# The report is one inline Jinja2 template rather than an f-string/`"".join`
-# HTML builder: autoescape=True escapes every `{{ }}` value, so a model answer
-# containing <script>, & or " renders as text, never live markup (issue #13) —
-# no per-value manual escaping to forget. It stays inline (not a separate .html)
-# to keep the single-file "read-it-in-one-sitting" property; CSS/JS are passed
-# in as trusted context vars marked `| safe`, so Jinja never parses their {}/}}
-# as delimiters and they need no escaping (they are first-party, never model
+# The report's markup, CSS and JS each live in resources/ as one editable source
+# of truth (report.html.j2 / report.css / report.js), same framing as
+# resources/featherbench.svg — not long blobs buried in this module. They are
+# read lazily and cached, so importing eval.py never touches them; only rendering
+# a report does. The template is one Jinja2 template rather than an f-string/
+# `"".join` HTML builder: autoescape=True escapes every `{{ }}` value, so a model
+# answer containing <script>, & or " renders as text, never live markup
+# (issue #13) — no per-value manual escaping to forget. It is compiled via
+# _REPORT_ENV.from_string(...) (NOT a FileSystemLoader) precisely so autoescape
+# stays on — this is the issue #13 escape guard and must not regress. CSS/JS are
+# passed in as trusted context vars marked `| safe`, so Jinja never parses their
+# {}/}} as delimiters and they need no escaping (first-party, never model
 # output). Static entities (&middot;, &mdash;) are literal template text and so
 # are emitted verbatim — Jinja only escapes interpolated `{{ }}` output.
-REPORT_TEMPLATE = """\
-<!doctype html>
-<html lang='en'>
-<head>
-<meta charset='utf-8'>
-<meta name='viewport' content='width=device-width,initial-scale=1'>
-<link rel='icon' href='{{ report_favicon }}'>
-<title>Featherbench eval report</title>
-<style>{{ report_css | safe }}</style>
-</head>
-<body>
-<header>
-<div class='brand'>{{ report_icon | safe }}<h1>Featherbench eval report</h1></div>
-<div class='sub'>Generated by Featherbench &middot; {{ stamp }} &middot; {{ n_trials }} trials across {{ n_tasks }} tasks. All models run through the same harness.</div>
-<div class='controls'>
-<button class='on' data-mode='all'>All</button>
-<button data-mode='problem'>Not passed</button>
-<button data-mode='fail'>Fails</button>
-<button data-mode='refuse'>Refusals</button>
-<input id='search' placeholder='search response text…'>
-</div>
-</header>
-<main>
-{% for task in tasks %}
-<section class='task' data-cat='{{ task.cat or "" }}'>
-<h2>{{ task.tid }}{% if task.cat %}<span class='cat'>{{ task.cat }}</span>{% endif %}<span class='meta'>{% if task.scored %} &middot; {{ task.passed }}/{{ task.scored }} passed{% endif %}</span></h2>
-{% if task.description %}<p class='task-desc'>{{ task.description }}</p>{% endif %}
-{% if task.prompt %}<details class='prompt'><summary>prompt</summary><pre>{{ task.prompt }}</pre></details>{% endif %}
-{% for t in task.trials %}
-<div class='trial' data-status='{{ t.status }}' data-text='{{ t.search_blob }}'>
-<div class='row'><span class='badge {{ t.cls }}'>{{ t.word }}</span><span class='model'>{{ t.model }}</span><span class='meta'>trial {{ t.trial_num }} &middot; {% for b in t.bits %}{% if not loop.first %} &middot; {% endif %}{{ b }}{% endfor %}</span></div>
-{% if t.error %}<div class='detail'><span class='k'>error:</span> {{ t.error }}</div>
-{% elif t.refusal %}<div class='detail'><span class='k'>refusal category:</span> {{ t.refusal_category }}</div>
-{% elif t.check_detail %}<div class='detail'><span class='k'>checker:</span> {{ t.check_detail }}</div>
-{% endif %}
-{% if t.tool_calls_rendered %}<div class='detail'><span class='k'>tool calls:</span> {{ t.tool_calls_rendered }}</div>
-{% endif %}
-{% if t.rubric %}<div class='rubric'><span class='k'>rubric</span> {% if t.rubric_mean is not none %}mean {{ "%.1f"|format(t.rubric_mean) }}{% endif %} {% for c in t.rubric %}<span class='chip'>{{ c.judge }}: {% if c.score is not none %}{{ c.score }}{% else %}&mdash;{% endif %}{% if c.scores %} {% for s in c.scores %}<span class='subchip'>{{ s }}</span>{% endfor %}{% endif %}</span>{% endfor %}{% for c in t.rubric %}{% if c.rationale %}<div class='rat'>{{ c.judge }}: {{ c.rationale }}</div>{% endif %}{% endfor %}</div>
-{% endif %}
-{% if t.text %}<details class='resp'><summary>response ({{ t.text_len }} chars)</summary><pre>{{ t.text }}</pre></details>
-{% endif %}
-</div>
-{% endfor %}
-</section>
-{% endfor %}
-</main>
-<script>{{ report_js | safe }}</script>
-</body>
-</html>
-"""
-
-# Compile the template once at import: autoescape=True is the whole point of the
-# refactor; trim_blocks/lstrip_blocks keep the {% %} control lines from bloating
-# the output with blank lines.
 _REPORT_ENV = jinja2.Environment(autoescape=True, trim_blocks=True, lstrip_blocks=True)
-_REPORT_TMPL = _REPORT_ENV.from_string(REPORT_TEMPLATE)
+_REPORT_ASSET_CACHE = {}
+_REPORT_TMPL_CACHE = None
+
+
+def _report_asset(name):
+    """Text of a first-party report asset (report.css / report.js), read once
+    from resources/ and cached. Passed into the template as a `| safe` context
+    var — never model output, so no escaping needed."""
+    if name not in _REPORT_ASSET_CACHE:
+        _REPORT_ASSET_CACHE[name] = (RESOURCES_DIR / name).read_text()
+    return _REPORT_ASSET_CACHE[name]
+
+
+def _report_template():
+    """Compiled report template, read once from resources/report.html.j2 and
+    cached. Compiled via _REPORT_ENV.from_string(...) so autoescape=True is
+    preserved byte-for-byte — the issue #13 escape guard (do NOT switch to a
+    FileSystemLoader)."""
+    global _REPORT_TMPL_CACHE
+    if _REPORT_TMPL_CACHE is None:
+        _REPORT_TMPL_CACHE = _REPORT_ENV.from_string(
+            (RESOURCES_DIR / "report.html.j2").read_text())
+    return _REPORT_TMPL_CACHE
 
 
 def write_html_report(records, tasks_by_id, out_path=None):
@@ -1019,9 +908,9 @@ def write_html_report(records, tasks_by_id, out_path=None):
     defaults to results/report.html; the runner passes a per-run
     results/report-<ts>.html.
 
-    Rendering is a single autoescaping Jinja2 template (REPORT_TEMPLATE): this
-    function only shapes plain data — no HTML strings — so every untrusted model
-    value is escaped by the template, not by a hand-placed escape call.
+    Rendering is a single autoescaping Jinja2 template (resources/report.html.j2):
+    this function only shapes plain data — no HTML strings — so every untrusted
+    model value is escaped by the template, not by a hand-placed escape call.
     """
     out_path = out_path or (RESULTS_DIR / "report.html")
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
@@ -1030,8 +919,8 @@ def write_html_report(records, tasks_by_id, out_path=None):
     tasks = [_task_data(tid, by_task[tid], tasks_by_id.get(tid, {}), cats)
              for tid in sorted(by_task)]
     icon_svg, favicon = report_icon()
-    out_path.write_text(_REPORT_TMPL.render(
-        report_css=REPORT_CSS, report_js=REPORT_JS,
+    out_path.write_text(_report_template().render(
+        report_css=_report_asset("report.css"), report_js=_report_asset("report.js"),
         report_icon=icon_svg, report_favicon=favicon, stamp=stamp,
         n_trials=len(records), n_tasks=len({r["task"] for r in records}),
         tasks=tasks))
