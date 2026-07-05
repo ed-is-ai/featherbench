@@ -14,11 +14,11 @@ benchmark numbers produced on different scaffolds.
 Usage:
     python3 eval.py                          # all tasks x all models, 1 trial
     python3 eval.py --trials 3               # 3 trials per (task, model)
-    python3 eval.py --models fable-5,glm-5.2 --tasks csv-dedupe
+    python3 eval.py --models fable-5,glm-5.2 --tasks coding-csv-dedupe
     python3 eval.py --dry-run                # list what would run
 
 Layout (one file, five layers):
-    providers  — (cfg, prompt, tools) -> ModelResponse, registered by @provider
+    providers  — (cfg, prompt, tools) -> ModelResponse via one pinned OpenRouter call
     checkers   — (spec, text, tool_calls) -> (passed, detail), registered by @checker
     rubric     — optional cross-judged LLM scoring
     reports    — per-run results/summary-<ts>.md + results/report-<ts>.html
@@ -52,13 +52,14 @@ RESULTS_DIR = ROOT / "results"
 
 # ---------------------------------------------------------------- providers
 #
-# A provider is a function (cfg, prompt, tools) -> ModelResponse, registered
-# under models.json's (provider, api) pair. Adding a provider family is one
-# decorated function; nothing downstream changes.
+# One provider path: every model is called through call_openrouter, a single
+# pinned OpenRouter chat/completions stream. build_request / reduce_stream /
+# map_refusal are pure helpers (no I/O) so the routing pin, sampling gating,
+# TTFT clock and refusal mapping are all unit-testable without spending a token.
 
 @dataclass
 class ModelResponse:
-    """The normalized result every provider returns. Checkers, the rubric and
+    """The normalized result the provider returns. Checkers, the rubric and
     the reports only ever see this shape, never a raw SDK response."""
     text: str = ""
     refusal: bool = False
@@ -67,35 +68,149 @@ class ModelResponse:
     tool_calls: list = field(default_factory=list)
     input_tokens: int = None
     output_tokens: int = None
-    latency_s: float = None  # stamped by call_model
+    latency_s: float = None  # TTFT: time to first *content* token (D-04)
+    cost_usd: float = None  # USD actually charged, read from usage.cost
+    wall_clock_s: float = None  # full stream duration (thinking + content)
+    sampling_sent: dict = field(default_factory=dict)  # sampling params actually sent
 
 
-PROVIDERS = {}
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
 
-def provider(name, api=None):
-    """Register a provider function under (provider, api). The api=None entry
-    doubles as the fallback for configs whose "api" has no exact match."""
-    def register(fn):
-        PROVIDERS[(name, api)] = fn
-        return fn
-    return register
+def build_request(cfg, prompt, tools=None):
+    """PURE: return (kwargs, extra_body, sampling_sent) for one pinned OpenRouter
+    call — no I/O, so the routing pin and sampling gating are unit-testable.
+
+    Every request is pinned to the labeled provider (provider.order +
+    allow_fallbacks:false + require_parameters:true) so no silent fallback or
+    quantized endpoint scores a different model than the one labeled (D-08).
+    Only the sampling params listed in cfg["sampling"] are sent: with
+    require_parameters:true, sending a param the model's provider does not support
+    routes to no provider and 404s the trial (Pitfall 6), so gating is mandatory.
+    """
+    extra_body = {"provider": {"order": cfg["provider_order"],
+                               "allow_fallbacks": False,
+                               "require_parameters": True},
+                  "usage": {"include": True}}
+    if cfg.get("effort"):
+        # Unified reasoning control — the nested reasoning:{effort}, not a
+        # top-level reasoning_effort (a silent no-op for Claude over OpenRouter,
+        # Pitfall 5). Omitted entirely for models with no effort key.
+        extra_body["reasoning"] = {"effort": cfg["effort"]}
+    sampling_sent = {p: cfg["sampling"][p]
+                     for p in ("temperature", "top_p", "seed")
+                     if p in (cfg.get("sampling") or {})}
+    kwargs = dict(model=cfg["model"], messages=[{"role": "user", "content": prompt}],
+                  stream=True, stream_options={"include_usage": True},
+                  max_tokens=cfg.get("max_tokens", 64000), **sampling_sent)
+    if tools:
+        # Chat/completions nests the schema under a "function" key.
+        kwargs["tools"] = [{"type": "function", "function": {
+            "name": t["name"], "description": t.get("description", ""),
+            "parameters": t["parameters"]}} for t in tools]
+    return kwargs, extra_body, sampling_sent
+
+
+def reduce_stream(chunks, t0, now=time.monotonic):
+    """PURE: fold an OpenRouter chat stream into the fields ModelResponse needs.
+
+    Returns a dict — text, ttft, wall, input_tokens, output_tokens, cost,
+    finish_reason, native_finish_reason, tool_calls. TTFT is stamped at the first
+    non-empty content delta (reasoning/thinking deltas are ignored, D-04); wall is
+    stamped after the final chunk; cost and tokens come from the final usage-only
+    chunk (empty .choices). `now` is injectable so the clock is deterministic
+    under test.
+    """
+    parts = []
+    ttft = usage = fr = nfr = None
+    tool_frags = {}  # index -> {"name": str|None, "arguments": [str, ...]}
+    for chunk in chunks:
+        if getattr(chunk, "usage", None):
+            usage = chunk.usage
+        if not chunk.choices:  # final usage-only chunk carries no choices
+            continue
+        ch = chunk.choices[0]
+        delta = ch.delta
+        if getattr(delta, "content", None):
+            if ttft is None:
+                ttft = now() - t0  # first *content* token, not a reasoning delta
+            parts.append(delta.content)
+        for tc in (getattr(delta, "tool_calls", None) or []):
+            slot = tool_frags.setdefault(getattr(tc, "index", 0),
+                                         {"name": None, "arguments": []})
+            fn = getattr(tc, "function", None)
+            if fn is not None:
+                if getattr(fn, "name", None):
+                    slot["name"] = fn.name
+                if getattr(fn, "arguments", None):
+                    slot["arguments"].append(fn.arguments)
+        if ch.finish_reason:
+            fr = ch.finish_reason
+            nfr = getattr(ch, "native_finish_reason", None)
+    tool_calls = [{"name": f["name"], "arguments": _json_args("".join(f["arguments"]))}
+                  for _, f in sorted(tool_frags.items()) if f["name"]]
+    return {"text": "".join(parts), "ttft": ttft, "wall": now() - t0,
+            "input_tokens": getattr(usage, "prompt_tokens", None),
+            "output_tokens": getattr(usage, "completion_tokens", None),
+            "cost": getattr(usage, "cost", None),
+            "finish_reason": fr, "native_finish_reason": nfr,
+            "tool_calls": tool_calls}
+
+
+def map_refusal(finish_reason, native_finish_reason, message):
+    """PURE: map the (possibly native) finish reason to (refusal, category).
+
+    Provider signal first (D-01): a normalized content_filter, or a native
+    refusal/content_filter/safety stop, is a hard refusal. The OpenAI-compat path
+    rarely carries a structured category, so category is usually None.
+    """
+    hard = (finish_reason == "content_filter"
+            or (native_finish_reason or "").lower() in {"refusal", "content_filter", "safety"})
+    category = getattr(message, "refusal", None)
+    return hard, category
+
+
+def call_openrouter(cfg, prompt, tools=None):
+    """The single provider path: stream one pinned OpenRouter chat request and
+    fold it into a ModelResponse.
+
+    Every model — Claude, GPT, GLM — runs through here, so cost, TTFT/wall-clock,
+    sampling and refusal are all measured the same way and stay comparable. The
+    request is pinned (see build_request) so no fallback re-serves another model;
+    a safety refusal is recorded (refusal=True), never transparently re-served.
+    The API key is read only from the environment and never leaves this function.
+    """
+    from openai import OpenAI
+    client = OpenAI(base_url=OPENROUTER_BASE_URL, api_key=os.environ["OPENROUTER_API_KEY"])
+    kwargs, extra_body, sampling_sent = build_request(cfg, prompt, tools)
+    t0 = time.monotonic()
+    stream = client.chat.completions.create(extra_body=extra_body, **kwargs)
+    r = reduce_stream(stream, t0)
+    refusal, category = map_refusal(r["finish_reason"], r["native_finish_reason"], None)
+    return ModelResponse(
+        text=r["text"], refusal=refusal, refusal_category=category,
+        stop_reason=r["native_finish_reason"] or r["finish_reason"],
+        tool_calls=r["tool_calls"],
+        input_tokens=r["input_tokens"], output_tokens=r["output_tokens"],
+        cost_usd=r["cost"], latency_s=r["ttft"], wall_clock_s=r["wall"],
+        sampling_sent=sampling_sent)
 
 
 def call_model(name, cfg, prompt, tools=None):
-    """Dispatch to the registered provider and stamp wall-clock latency."""
-    fn = PROVIDERS.get((cfg["provider"], cfg.get("api"))) or PROVIDERS.get((cfg["provider"], None))
-    if fn is None:
-        raise ValueError(f"unknown provider {cfg['provider']!r} for model {name}")
-    t0 = time.monotonic()
-    resp = fn(cfg, prompt, tools)
-    resp.latency_s = time.monotonic() - t0
-    return resp
+    """Route a model through the single OpenRouter path.
+
+    Timing is owned by call_openrouter (only the stream sees the first content
+    token), so — unlike the old dispatcher — nothing is stamped here.
+    """
+    return call_openrouter(cfg, prompt, tools)
 
 
 def _is_rate_limit(exc):
-    """True for provider rate-limit / 429 errors (anthropic & openai both raise a
-    RateLimitError carrying status_code 429), without importing either SDK."""
+    """True for rate-limit / 429 errors, without importing any provider SDK.
+
+    The OpenAI SDK's RateLimitError carries status_code 429; we also fall back to
+    the exception's type name / message so any client raising a rate-limit error
+    is retried the same way."""
     status = getattr(exc, "status_code", None) or getattr(
         getattr(exc, "response", None), "status_code", None)
     if status == 429:
@@ -122,111 +237,6 @@ def call_with_retry(name, cfg, prompt, tools=None, retries=4, base_delay=2.0):
             print(f"   rate-limited ({type(exc).__name__}); "
                   f"retry {attempt + 1}/{retries} in {wait:.0f}s", flush=True)
             time.sleep(wait)
-
-
-@provider("anthropic")
-def call_anthropic(cfg, prompt, tools=None):
-    """Claude Fable 5 via the official anthropic SDK.
-
-    Fable specifics: thinking is always on (the `thinking` param must be
-    omitted), sampling params are not accepted, and depth is controlled with
-    output_config.effort. Streaming is used because hard tasks can run for
-    minutes and non-streaming requests hit HTTP timeouts.
-
-    Deliberately NO `fallbacks` parameter: in production you would opt in so a
-    safety-classifier refusal is transparently re-served by Opus 4.8, but in
-    an eval that would silently score another model's output as Fable's.
-    Refusals are recorded as a result instead.
-    """
-    import anthropic
-    client = anthropic.Anthropic()
-    kwargs = dict(
-        model=cfg["model"],
-        max_tokens=cfg.get("max_tokens", 64000),
-        messages=[{"role": "user", "content": prompt}],
-    )
-    # effort is GA on Fable/Opus 4.5+/Sonnet 4.6+ but errors on Haiku 4.5 and
-    # older models — omit `effort` from those models' config to skip it.
-    if cfg.get("effort"):
-        kwargs["output_config"] = {"effort": cfg["effort"]}
-    if tools:
-        # Neutral {name, description, parameters} -> Anthropic tool shape.
-        kwargs["tools"] = [{"name": t["name"], "description": t.get("description", ""),
-                            "input_schema": t["parameters"]} for t in tools]
-    with client.messages.stream(**kwargs) as stream:
-        msg = stream.get_final_message()
-    usage = dict(input_tokens=msg.usage.input_tokens, output_tokens=msg.usage.output_tokens)
-    if msg.stop_reason == "refusal":
-        return ModelResponse(
-            refusal=True, stop_reason="refusal",
-            refusal_category=msg.stop_details.category if msg.stop_details else None,
-            **usage)
-    return ModelResponse(
-        text="".join(b.text for b in msg.content if b.type == "text"),
-        # tool_use blocks carry .input already parsed into a dict.
-        tool_calls=[{"name": b.name, "arguments": b.input}
-                    for b in msg.content if b.type == "tool_use"],
-        stop_reason=msg.stop_reason, **usage)
-
-
-@provider("openai", api="responses")
-def call_openai_responses(cfg, prompt, tools=None):
-    """GPT-5.x via the OpenAI Responses API."""
-    from openai import OpenAI
-    client = OpenAI()
-    kwargs = dict(model=cfg["model"], input=prompt)
-    # Reasoning effort applies to reasoning models (o-series, gpt-5.x); omit it
-    # from config for non-reasoning models (gpt-4.1/4o) where it would error.
-    if cfg.get("reasoning_effort"):
-        kwargs["reasoning"] = {"effort": cfg["reasoning_effort"]}
-    if tools:
-        # Responses API function tools are flat: {type, name, description, parameters}.
-        kwargs["tools"] = [{"type": "function", "name": t["name"],
-                            "description": t.get("description", ""),
-                            "parameters": t["parameters"]} for t in tools]
-    r = client.responses.create(**kwargs)
-    return ModelResponse(
-        text=r.output_text, stop_reason=r.status,
-        tool_calls=[{"name": item.name, "arguments": _json_args(item.arguments)}
-                    for item in (r.output or [])
-                    if getattr(item, "type", None) == "function_call"],
-        input_tokens=r.usage.input_tokens, output_tokens=r.usage.output_tokens)
-
-
-@provider("openai")
-@provider("openai_compatible")
-def call_openai_chat(cfg, prompt, tools=None):
-    """Any OpenAI-compatible chat/completions endpoint (used for GLM-5.2)."""
-    from openai import OpenAI
-    client = OpenAI(**_client_kwargs(cfg))
-    kwargs = dict(model=cfg["model"], messages=[{"role": "user", "content": prompt}])
-    if tools:
-        # Chat/completions nests the schema under a "function" key.
-        kwargs["tools"] = [{"type": "function", "function": {
-            "name": t["name"], "description": t.get("description", ""),
-            "parameters": t["parameters"]}} for t in tools]
-    r = client.chat.completions.create(**kwargs)
-    m = r.choices[0].message
-    return ModelResponse(
-        text=m.content or "", stop_reason=r.choices[0].finish_reason,
-        tool_calls=[{"name": tc.function.name, "arguments": _json_args(tc.function.arguments)}
-                    for tc in (getattr(m, "tool_calls", None) or [])],
-        input_tokens=r.usage.prompt_tokens, output_tokens=r.usage.completion_tokens)
-
-
-def _client_kwargs(cfg):
-    """API key and base URL for OpenAI-compatible endpoints, resolved from the
-    environment variables named in the model config."""
-    kwargs = {}
-    if "api_key_env" in cfg:
-        key = os.environ.get(cfg["api_key_env"])
-        if not key:
-            raise RuntimeError(f"environment variable {cfg['api_key_env']} is not set")
-        kwargs["api_key"] = key
-    base_url = os.environ.get(cfg.get("base_url_env", ""), "") or cfg.get("default_base_url")
-    if base_url:
-        kwargs["base_url"] = base_url
-    return kwargs
 
 
 def _json_args(raw):
@@ -640,11 +650,15 @@ def _overall_section(by_model):
             f"{sum(costs):.2f}" if costs else "n/a",
         ])
     header = ["Model", "Trials", "Pass", "Fail", "Refusals", "Errors", "Pass rate (95% CI)",
-              "Rubric /10", "Median latency (s)", "Total out-tokens", "Cost (USD)"]
+              "Rubric /10", "Median TTFT (s)", "Total out-tokens", "Cost (USD)"]
     return md_table(header, rows) + [
         "", "Pass rate is over Pass+Fail (refusals and errors excluded); the "
         "bracket is the 95% Wilson interval. Wide intervals mean too few trials "
-        "to conclude anything — raise `--trials`."]
+        "to conclude anything — raise `--trials`.",
+        "", "Median TTFT is time-to-first-content-token (reasoning/thinking deltas "
+        "are excluded, so a long-thinking model is not penalised for latency it "
+        "spends reasoning); total wall-clock per trial is recorded on each record "
+        "and shown in the HTML report."]
 
 
 def _per_task_section(records, by_model):
@@ -861,7 +875,9 @@ def _trial_html(r):
 
     bits = []
     if r.get("latency_s") is not None:
-        bits.append(f"{r['latency_s']:.1f}s")
+        bits.append(f"{r['latency_s']:.1f}s TTFT")
+    if r.get("wall_clock_s") is not None:
+        bits.append(f"{r['wall_clock_s']:.1f}s wall")
     if r.get("output_tokens") is not None:
         bits.append(f"{r['output_tokens']} out-tok")
     if r.get("cost_usd") is not None:
@@ -912,13 +928,6 @@ def _trial_html(r):
 
 # ---------------------------------------------------------------- runner
 
-def cost_usd(cfg, input_tokens, output_tokens):
-    p = cfg.get("pricing_per_mtok") or {}
-    if p.get("input") is None or p.get("output") is None:
-        return None
-    return input_tokens / 1e6 * p["input"] + output_tokens / 1e6 * p["output"]
-
-
 REFUSAL_DISPOSITIONS = {"pass": True, "fail": False, "neutral": None}
 
 
@@ -965,15 +974,16 @@ def run_trial(run_id, task, model_name, cfg, trial, judges):
             record["passed"] = passed
             record["check_detail"] = detail
             verdict = {True: "PASS", False: "FAIL", None: "DONE"}[passed]
-            print(f"   {verdict}  ({resp.latency_s:.1f}s, {resp.output_tokens} out-tokens)")
+            # latency_s is now TTFT and is None for a content-less (e.g. tool-only) reply
+            ttft = f"{resp.latency_s:.1f}s" if resp.latency_s is not None else "n/a"
+            print(f"   {verdict}  ({ttft}, {resp.output_tokens} out-tokens)")
             if task.get("rubric") and judges:
                 record["rubric"] = run_rubric(task, resp.text, judges)
                 # exclude the contestant's own self-score from its headline mean
                 record["rubric_mean"] = rubric_mean(record["rubric"], exclude=model_name)
                 grid = ", ".join(f"{j}:{s.get('score')}" for j, s in record["rubric"].items())
                 print(f"   rubric {record['rubric_mean']}  ({grid})")
-        record["cost_usd"] = cost_usd(cfg, record.get("input_tokens") or 0,
-                                      record.get("output_tokens") or 0)
+        # cost_usd is already on the record via asdict(resp) — read from usage.cost
         # keep full text for later inspection, but cap runaway outputs
         record["text"] = (record.get("text") or "")[:200000]
     except Exception as e:  # record the failure, keep the run going
