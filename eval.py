@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Cross-model eval harness: GLM-5.2 vs GPT-5.5 vs Claude Fable 5.
+"""Cross-model eval harness.
 
 Runs every task in tasks/ against every model in models.json, N trials each.
 Each run writes its own timestamped set of files — results/results-<ts>.jsonl,
@@ -14,7 +14,7 @@ benchmark numbers produced on different scaffolds.
 Usage:
     python3 eval.py                          # all tasks x all models, 1 trial
     python3 eval.py --trials 3               # 3 trials per (task, model)
-    python3 eval.py --models fable-5,glm-5.2 --tasks coding-csv-dedupe
+    python3 eval.py --models keyA,keyB --tasks coding-csv-dedupe
     python3 eval.py --dry-run                # list what would run
 
 Layout (one file, five layers):
@@ -30,6 +30,7 @@ locally. Run this harness on an isolated machine (see README).
 import argparse
 import base64
 import concurrent.futures
+import functools
 import hashlib
 import itertools
 import jinja2
@@ -57,8 +58,7 @@ RESOURCES_DIR = ROOT / "resources"
 #
 # One provider path: every model is called through call_openrouter, a single
 # pinned OpenRouter chat/completions stream. build_request / reduce_stream /
-# map_refusal are pure helpers (no I/O) so the routing pin, sampling gating,
-# TTFT clock and refusal mapping are all unit-testable without spending a token.
+# map_refusal are pure (no I/O), so each is unit-testable without spending a token.
 
 @dataclass
 class ModelResponse:
@@ -71,7 +71,7 @@ class ModelResponse:
     tool_calls: list = field(default_factory=list)
     input_tokens: int = None
     output_tokens: int = None
-    latency_s: float = None  # TTFT: time to first *content* token (D-04)
+    latency_s: float = None  # TTFT: time to first *content* token
     cost_usd: float = None  # USD actually charged, read from usage.cost
     wall_clock_s: float = None  # full stream duration (thinking + content)
     sampling_sent: dict = field(default_factory=dict)  # sampling params actually sent
@@ -86,10 +86,10 @@ def build_request(cfg, prompt, tools=None):
 
     Every request is pinned to the labeled provider (provider.order +
     allow_fallbacks:false + require_parameters:true) so no silent fallback or
-    quantized endpoint scores a different model than the one labeled (D-08).
+    quantized endpoint scores a different model than the one labeled.
     Only the sampling params listed in cfg["sampling"] are sent: with
     require_parameters:true, sending a param the model's provider does not support
-    routes to no provider and 404s the trial (Pitfall 6), so gating is mandatory.
+    routes to no provider and 404s the trial, so gating is mandatory.
     """
     extra_body = {"provider": {"order": cfg["provider_order"],
                                "allow_fallbacks": False,
@@ -97,8 +97,8 @@ def build_request(cfg, prompt, tools=None):
                   "usage": {"include": True}}
     if cfg.get("effort"):
         # Unified reasoning control — the nested reasoning:{effort}, not a
-        # top-level reasoning_effort (a silent no-op for Claude over OpenRouter,
-        # Pitfall 5). Omitted entirely for models with no effort key.
+        # top-level reasoning_effort (a silent no-op). Omitted entirely for
+        # models with no effort key.
         extra_body["reasoning"] = {"effort": cfg["effort"]}
     sampling_sent = {p: cfg["sampling"][p]
                      for p in ("temperature", "top_p", "seed")
@@ -114,12 +114,20 @@ def build_request(cfg, prompt, tools=None):
     return kwargs, extra_body, sampling_sent
 
 
+def _json_args(raw):
+    """Tool-call arguments arrive as a JSON string; tolerate malformed ones."""
+    try:
+        return json.loads(raw or "{}")
+    except (ValueError, TypeError):
+        return {}
+
+
 def reduce_stream(chunks, t0, now=time.monotonic):
     """PURE: fold an OpenRouter chat stream into the fields ModelResponse needs.
 
     Returns a dict — text, ttft, wall, input_tokens, output_tokens, cost,
     finish_reason, native_finish_reason, tool_calls. TTFT is stamped at the first
-    non-empty content delta (reasoning/thinking deltas are ignored, D-04); wall is
+    non-empty content delta (reasoning/thinking deltas are ignored); wall is
     stamped after the final chunk; cost and tokens come from the final usage-only
     chunk (empty .choices). `now` is injectable so the clock is deterministic
     under test.
@@ -163,7 +171,7 @@ def reduce_stream(chunks, t0, now=time.monotonic):
 def map_refusal(finish_reason, native_finish_reason, message):
     """PURE: map the (possibly native) finish reason to (refusal, category).
 
-    Provider signal first (D-01): a normalized content_filter, or a native
+    Provider signal first: a normalized content_filter, or a native
     refusal/content_filter/safety stop, is a hard refusal. The OpenAI-compat path
     rarely carries a structured category, so category is usually None.
     """
@@ -177,10 +185,8 @@ def call_openrouter(cfg, prompt, tools=None):
     """The single provider path: stream one pinned OpenRouter chat request and
     fold it into a ModelResponse.
 
-    Every model — Claude, GPT, GLM — runs through here, so cost, TTFT/wall-clock,
-    sampling and refusal are all measured the same way and stay comparable. The
-    request is pinned (see build_request) so no fallback re-serves another model;
-    a safety refusal is recorded (refusal=True), never transparently re-served.
+    Every model runs through here, so cost, TTFT/wall-clock, sampling and refusal
+    are all measured the same way and stay comparable (pinned in build_request).
     The API key is read only from the environment and never leaves this function.
     """
     from openai import OpenAI
@@ -199,28 +205,6 @@ def call_openrouter(cfg, prompt, tools=None):
         sampling_sent=sampling_sent)
 
 
-def call_model(name, cfg, prompt, tools=None):
-    """Route a model through the single OpenRouter path.
-
-    Timing is owned by call_openrouter (only the stream sees the first content
-    token), so — unlike the old dispatcher — nothing is stamped here.
-    """
-    return call_openrouter(cfg, prompt, tools)
-
-
-def _is_rate_limit(exc):
-    """True for rate-limit / 429 errors, without importing any provider SDK.
-
-    The OpenAI SDK's RateLimitError carries status_code 429; we also fall back to
-    the exception's type name / message so any client raising a rate-limit error
-    is retried the same way."""
-    status = getattr(exc, "status_code", None) or getattr(
-        getattr(exc, "response", None), "status_code", None)
-    if status == 429:
-        return True
-    return "ratelimit" in type(exc).__name__.lower() or "rate limit" in str(exc).lower()
-
-
 _TRANSIENT_STATUS = {429, 500, 502, 503, 504}
 
 
@@ -229,16 +213,15 @@ def _is_transient(exc):
 
     A flaky provider blip — a 429 rate limit, a 5xx (500/502/503/504), a dropped
     connection or a read timeout — is worth retrying: it is not the model being
-    wrong, just the pipe. Read the status the same SDK-free way as _is_rate_limit
-    (off the exc or its .response) and match the connection/timeout families by
-    type name / message so openai's APIConnectionError / APITimeoutError retry
-    without an import.
+    wrong, just the pipe. Read the status SDK-free directly off the exc or its
+    .response and match the connection/timeout families by type name / message
+    so openai's APIConnectionError / APITimeoutError retry without an import.
 
     Deliberately EXCLUDES every other 4xx — 400/401/403/404/422. In particular a
     404 is the require_parameters:true routing-pin miss (a mislabeled-model
     misconfiguration): it must fail loudly and immediately, never be masked as a
     transient retry, or the benchmark scores an endpoint that is not the one
-    labeled. This is the fidelity guard (REL-01)."""
+    labeled. This is the fidelity guard."""
     status = getattr(exc, "status_code", None) or getattr(
         getattr(exc, "response", None), "status_code", None)
     if status in _TRANSIENT_STATUS:
@@ -248,25 +231,27 @@ def _is_transient(exc):
     blob = (type(exc).__name__ + " " + str(exc)).lower()
     if "connection" in blob or "timeout" in blob:
         return True
-    return _is_rate_limit(exc)  # message-only rate limits (no status) stay transient
+    # message-only rate limits (no status) stay transient; probe type name and
+    # message on their own sources, not the joined blob, so a no-space token in
+    # the message (or a spaced phrase in the type name) cannot cross-match.
+    return "ratelimit" in type(exc).__name__.lower() or "rate limit" in str(exc).lower()
 
 
-def call_with_retry(name, cfg, prompt, tools=None, retries=4, base_delay=2.0):
-    """call_model with exponential backoff on transient errors only.
+def call_with_retry(cfg, prompt, tools=None, retries=4, base_delay=2.0):
+    """call_openrouter with exponential backoff on transient errors only.
 
     A full-catalog x N-trials run reliably hits 429s and the occasional 5xx /
     connection reset / read timeout; without this each becomes an error record and
     silently thins the dataset. Only transient failures (429, 5xx, connection,
-    timeout) are retried — non-transient errors (bad request, auth, and above all
-    a routing-pin 404) are re-raised immediately so a mislabeled-model
-    misconfiguration fails loudly instead of being masked. Backoff is jittered
-    (base_delay * 2**attempt + uniform(0, base_delay)) to avoid a thundering herd
-    under --concurrency > 1. Latency is measured per attempt inside call_model, so
-    the recorded latency_s reflects the successful call, not the waits.
+    timeout) are retried; non-transient errors are re-raised immediately (see
+    _is_transient). Backoff is jittered (base_delay * 2**attempt +
+    uniform(0, base_delay)) to avoid a thundering herd under --concurrency > 1.
+    Latency is measured per attempt inside call_openrouter, so the recorded
+    latency_s reflects the successful call, not the waits.
     """
     for attempt in range(retries + 1):
         try:
-            return call_model(name, cfg, prompt, tools)
+            return call_openrouter(cfg, prompt, tools)
         except Exception as exc:
             if attempt >= retries or not _is_transient(exc):
                 raise
@@ -274,14 +259,6 @@ def call_with_retry(name, cfg, prompt, tools=None, retries=4, base_delay=2.0):
             print(f"   transient error ({type(exc).__name__}); "
                   f"retry {attempt + 1}/{retries} in {wait:.0f}s", flush=True)
             time.sleep(wait)
-
-
-def _json_args(raw):
-    """Tool-call arguments arrive as a JSON string; tolerate malformed ones."""
-    try:
-        return json.loads(raw or "{}")
-    except (ValueError, TypeError):
-        return {}
 
 
 # ---------------------------------------------------------------- checkers
@@ -332,8 +309,7 @@ def check_tool_called(spec, text, tool_calls):
     """PASS if some tool call matches `tool` (and every arg in `args`, if given).
 
     `arg_match` selects how each arg is compared: "substring" (default, loose),
-    "exact" (normalized equality) or "word" (word-boundary). Default stays loose so
-    existing tool tasks (location~=Paris, destination~=Tokyo) keep passing."""
+    "exact" (normalized equality) or "word" (word-boundary)."""
     name, want = spec["tool"], spec.get("args")
     mode = spec.get("arg_match", "substring")
     for call in tool_calls:
@@ -342,16 +318,14 @@ def check_tool_called(spec, text, tool_calls):
         got = call.get("arguments") or {}
         if want is None or all(_arg_match(got.get(k), v, mode) for k, v in want.items()):
             return True, f"called {name}" + (f" with {want}" if want else "")
-    return False, f"no matching call to {name}({spec.get('args') or ''})"
+    return False, f"no matching call to {name}({want or ''})"
 
 
 def _arg_match(got, want, mode="substring"):
     """Compare a tool-call arg `got` against the wanted `want` under `mode`.
-
-    substring (default): `want` normalized is a substring of `got` normalized —
-      tolerates 'Paris' matching 'Paris, France'; coerces numbers so 2 matches "2".
-    exact: normalized equality — 'Tokyo' no longer matches 'Tokyostan', '2' not '20'.
-    word: word-boundary match — 'Tokyo' matches 'to Tokyo' but not 'Tokyostan'.
+    substring (default): `want` normalized is a substring of `got` normalized,
+    coercing numbers so 2 matches "2". exact: normalized equality. word:
+    word-boundary match ('Tokyo' matches 'to Tokyo' but not 'Tokyostan').
     """
     g, w = str(got).strip().lower(), str(want).strip().lower()
     if mode == "exact":
@@ -381,8 +355,7 @@ def check_not_contains(spec, text, tool_calls):
     return (not found), (f"forbidden term present: {found!r}" if found else "ok")
 
 
-# Negation cue immediately before a banned term, allowing only light filler between:
-# a bare cue word (no|not|without|never|avoid|omit|skip) or a "*-free"/"free from" token.
+# Negation cue governing a banned term: a bare cue word or a "*-free" token, plus light filler.
 _NEG_CUE = re.compile(
     r"(?:\b(?:no|not|without|never|avoid|omit|skip)\b|[\w-]*free\b)[\s-]*(?:\w+\s+){0,2}$",
     re.I)
@@ -390,12 +363,10 @@ _NEG_CUE = re.compile(
 
 def _negation_aware_present(spec, value, text):
     """Opt-in ("negation_aware": true) presence test that does NOT count a banned
-    term as present when it is negated: either the term itself carries a
-    "-free"/" free" suffix ("bacon-free"), or a negation cue immediately governs it
-    ("no bacon", "without bacon", "fish-free Worcestershire"). A cue only shields a
-    term across light filler and never across a comma/period, so "no salt, then add
-    bacon" still counts bacon. Returns True iff at least one AFFIRMATIVE occurrence
-    exists. (whole_word tasks keep exact semantics on the default, opted-out path.)"""
+    term as present when negated: the term carries a "-free"/" free" suffix, or a
+    negation cue governs it ("no bacon", "without bacon"). A cue shields only across
+    light filler, never across a comma/period ("no salt, then add bacon" still
+    counts bacon). Returns True iff an AFFIRMATIVE occurrence exists."""
     low, val = text.lower(), value.lower()
     n, start = len(val), 0
     while True:
@@ -419,7 +390,7 @@ def _value_present(spec, value, text):
     """Whether `value` occurs in `text`. Case-insensitive substring by default;
     "whole_word": true requires word boundaries (\\bvalue\\b), so 'kill' no longer
     matches 'skill'. Word boundaries treat punctuation as a break, so 'meat' still
-    matches 'meat-free' — reach for a `regex` checker when you need that precision."""
+    matches 'meat-free' — use a `regex` checker for more precision."""
     if spec.get("whole_word"):
         return re.search(r"\b" + re.escape(value) + r"\b", text, re.I) is not None
     return value.lower() in text.lower()
@@ -467,10 +438,9 @@ def extract_code(text):
     """Pick the code block most likely to be the solution.
 
     Prefer the last ```python/```py block — models label their final answer and
-    put it last. Only if nothing is python-tagged do we fall back to the largest
-    block, which dodges the common failure where an answer *ends* with a short
-    untagged example-usage or sample-output fence that the old "last block wins"
-    rule would have run as the solution. Returns None if there are no blocks.
+    put it last. Only if nothing is python-tagged fall back to the largest block,
+    so a trailing untagged example-usage or sample-output fence is not run as the
+    solution. Returns None if there are no blocks.
     """
     blocks = CODE_BLOCK_RE.findall(text)  # [(lang, body), ...]
     if not blocks:
@@ -512,9 +482,8 @@ JUDGE_ANSWER_CAP = 40000  # chars (~8k tokens); rubric answers are prose — thi
 def run_rubric(task, answer, judges):
     """Every judge model scores the answer blind. Returns {judge: {score, rationale}}.
 
-    Using all three contestants as judges makes judge bias measurable (the
-    summary prints a judge x contestant matrix) instead of hidden behind a
-    single 'neutral' judge that is actually one of the contestants.
+    Every contestant also judges, so judge bias is measurable rather than hidden
+    behind a single 'neutral' judge that is itself one of the contestants.
 
     The answer is capped at JUDGE_ANSWER_CAP before judging: a runaway response
     would otherwise be sent in full to every judge (the record's 200k cap is
@@ -539,13 +508,12 @@ def _judge_once(judge_name, cfg, prompt, n_criteria):
     error rather than raising inside run_trial (a bad judge must not kill a trial).
 
     The judge call's real cost (resp.cost_usd, read from usage.cost) is carried on
-    every returned dict so run_trial can aggregate a separate judge_cost_usd — the
-    cost was spent even when the reply is unparseable (RUB-01). Only a call that
-    never returned (the except branch) has unknown cost -> None.
+    every returned dict — the cost was spent even when the reply is unparseable.
+    Only a call that never returned (the except branch) has unknown cost -> None.
     """
     resp = None
     try:
-        resp = call_with_retry(judge_name, cfg, prompt)
+        resp = call_with_retry(cfg, prompt)
         reply = resp.text or ""
         m = re.search(r"\{.*\}", reply, re.S)
         if not m:
@@ -568,12 +536,9 @@ def _judge_once(judge_name, cfg, prompt, n_criteria):
 
 
 def rubric_mean(scores, exclude=None):
-    """Mean rubric score, leaving out the contestant's own self-score.
-
-    Every contestant is also a judge, so a self-flattering model would inflate
-    its own headline number. Passing `exclude=<contestant>` drops the judge whose
-    name matches (the self-cell). The raw per-judge scores stay in the record, so
-    the judge-bias matrix still shows self-preference. Returns None when no
+    """Mean rubric score, leaving out the contestant's own self-score (a model that
+    also judges would otherwise inflate its own headline). Passing
+    `exclude=<contestant>` drops the judge whose name matches. Returns None when no
     independent judge scored the answer (e.g. a single-model run judging itself).
     """
     vals = [s["score"] for judge, s in (scores or {}).items()
@@ -603,16 +568,10 @@ def load_tasks(task_filter):
     return tasks
 
 
-def task_categories():
-    """Map task id -> category by scanning tasks/ (for the summary rollup)."""
-    cats = {}
-    for f in TASKS_DIR.glob("*.json"):
-        try:
-            d = json.loads(f.read_text())
-        except ValueError:
-            continue
-        cats[d.get("id", f.stem)] = d.get("category", "uncategorized")
-    return cats
+def categories_by_id(tasks_by_id):
+    """Derive task id -> category from the already-loaded tasks (single source of
+    truth) — no re-scan of tasks/ at report time."""
+    return {tid: (t.get("category") or "uncategorized") for tid, t in tasks_by_id.items()}
 
 
 def select_models(spec, catalog):
@@ -630,28 +589,30 @@ def select_models(spec, catalog):
     return {k: v for k, v in catalog.items() if v.get("enabled", True)}
 
 
+def _validated_set(spec, available, label):
+    """Parse a comma list into a set; abort (sys.exit) with the sorted valid
+    list on any unknown entry — a typo'd filter shouldn't silently drop work."""
+    wanted = {s.strip() for s in spec.split(",") if s.strip()}
+    unknown = wanted - available
+    if unknown:
+        sys.exit("unknown %s: %s\navailable: %s"
+                 % (label, ", ".join(sorted(unknown)), ", ".join(sorted(available))))
+    return wanted
+
+
 def select_tasks(tasks_spec, categories_spec):
     """--tasks names ids, --categories names categories; they intersect. An
     unknown id or category aborts with the valid list, like --models — a typo'd
     filter shouldn't silently drop work and waste a run."""
     all_tasks = load_tasks(None)
+    tasks = all_tasks
     if tasks_spec:
-        wanted = {t.strip() for t in tasks_spec.split(",") if t.strip()}
-        available = {t["id"] for t in all_tasks}
-        unknown = wanted - available
-        if unknown:
-            sys.exit("unknown task id(s): %s\navailable: %s"
-                     % (", ".join(sorted(unknown)), ", ".join(sorted(available))))
-        tasks = [t for t in all_tasks if t["id"] in wanted]
-    else:
-        tasks = all_tasks
+        wanted = _validated_set(tasks_spec, {t["id"] for t in all_tasks}, "task id(s)")
+        tasks = [t for t in tasks if t["id"] in wanted]
     if categories_spec:
-        wanted = {c.strip() for c in categories_spec.split(",") if c.strip()}
-        available = {t.get("category", "uncategorized") for t in all_tasks}
-        unknown = wanted - available
-        if unknown:
-            sys.exit("unknown categor(y/ies): %s\navailable: %s"
-                     % (", ".join(sorted(unknown)), ", ".join(sorted(available))))
+        wanted = _validated_set(categories_spec,
+                                {t.get("category", "uncategorized") for t in all_tasks},
+                                "categor(y/ies)")
         tasks = [t for t in tasks if t.get("category") in wanted]
     return tasks
 
@@ -674,10 +635,8 @@ def pass_counts(rs):
 
 def wilson_interval(passed, n, z=1.96):
     """95% Wilson score interval for a binomial pass rate, as (lo, hi) fractions.
-
-    Binary checkers over a handful of trials carry huge uncertainty — at n=3 the
-    interval spans ~40 points either way, which is exactly what a reader should
-    see before treating "2/3" as a real number. Returns None when n == 0.
+    Over a handful of trials the interval is wide — that uncertainty is the point,
+    so "2/3" is not mistaken for a real number. Returns None when n == 0.
     """
     if n == 0:
         return None
@@ -713,14 +672,13 @@ def _mixed_hash_tasks(records):
     return {t: hs for t, hs in by_task.items() if len(hs) > 1}
 
 
-def write_summary(records, out_path=None):
-    """Aggregate one run's records into a summary markdown file.
-
-    out_path defaults to results/summary.md; the runner passes a per-run
-    results/summary-<ts>.md so runs never overwrite each other. The staleness
-    guard below still fires if a caller hands in records that span task
-    versions (e.g. several run files concatenated by hand)."""
+def write_summary(records, tasks_by_id, out_path=None):
+    """Aggregate one run's records into a summary markdown file. out_path defaults
+    to results/summary.md; the runner passes a per-run results/summary-<ts>.md so
+    runs never overwrite each other. The staleness guard below still fires on
+    records that span task versions (e.g. concatenated run files)."""
     out_path = out_path or (RESULTS_DIR / "summary.md")
+    cats = categories_by_id(tasks_by_id)
     by_model = group_by(records, "model")
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     lines = ["# Eval summary", "",
@@ -737,7 +695,7 @@ def write_summary(records, out_path=None):
                   "prompt/checker versions in results.jsonl — the summary blends them")
     lines += _overall_section(by_model)
     lines += _per_task_section(records, by_model)
-    lines += _category_section(records, by_model)
+    lines += _category_section(records, by_model, cats)
     lines += _bias_section(records)
     out_path.write_text("\n".join(lines) + "\n")
 
@@ -747,10 +705,11 @@ def _overall_section(by_model):
     for model in sorted(by_model):
         rs = by_model[model]
         passed, scored = pass_counts(rs)
-        rubs = [r["rubric_mean"] for r in rs if r.get("rubric_mean") is not None]
-        lats = [r["latency_s"] for r in rs if r.get("latency_s") is not None]
-        costs = [r["cost_usd"] for r in rs if r.get("cost_usd") is not None]
-        judge_costs = [r["judge_cost_usd"] for r in rs if r.get("judge_cost_usd") is not None]
+        vals = lambda k: [r[k] for r in rs if r.get(k) is not None]
+        rubs = vals("rubric_mean")
+        lats = vals("latency_s")
+        costs = vals("cost_usd")
+        judge_costs = vals("judge_cost_usd")
         rows.append([
             model, len(rs), passed, scored - passed,
             sum(1 for r in rs if r.get("refusal")),
@@ -793,9 +752,8 @@ def _per_task_section(records, by_model):
     return ["", "## Per task", ""] + md_table(["Task"] + models, rows)
 
 
-def _category_section(records, by_model):
+def _category_section(records, by_model, cats):
     """Pass rate rolled up by task category (tool-use / realworld / coding / ...)."""
-    cats = task_categories()
     models = sorted(by_model)
     names = sorted({cats.get(r["task"], "uncategorized") for r in records})
     if not names:
@@ -835,216 +793,69 @@ def _bias_section(records):
 
 # ---------------------------------------------------------------- html report
 
-REPORT_CSS = """
-:root { --bg:#fff; --fg:#1a1a1a; --muted:#666; --card:#f6f6f7; --border:#e2e2e5;
-        --pass:#137333; --passbg:#e6f4ea; --fail:#c5221f; --failbg:#fce8e6;
-        --refuse:#b06000; --refusebg:#fef3e0; --err:#7c3aed; --errbg:#f0e9fc;
-        --accent:#1a73e8; --code:#f0f0f2; }
-@media (prefers-color-scheme: dark) {
-  :root { --bg:#16171a; --fg:#e6e6e8; --muted:#9a9aa2; --card:#1e2024; --border:#31333a;
-          --pass:#81c995; --passbg:#1e3226; --fail:#f28b82; --failbg:#3a2221;
-          --refuse:#fcc46b; --refusebg:#3a2e18; --err:#c5a3ff; --errbg:#2b2440;
-          --accent:#8ab4f8; --code:#101114; } }
-* { box-sizing:border-box; }
-body { margin:0; font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
-       background:var(--bg); color:var(--fg); }
-header { padding:20px 24px; border-bottom:1px solid var(--border); position:sticky; top:0;
-         background:var(--bg); z-index:5; }
-.brand { display:flex; align-items:center; gap:10px; margin:0 0 4px; }
-.brand svg { width:28px; height:28px; flex:none; }
-h1 { margin:0; font-size:18px; }
-.sub { color:var(--muted); font-size:13px; }
-.controls { margin-top:12px; display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
-.controls button { font:inherit; padding:5px 12px; border:1px solid var(--border); border-radius:999px;
-        background:var(--card); color:var(--fg); cursor:pointer; }
-.controls button.on { background:var(--accent); color:#fff; border-color:var(--accent); }
-.controls input { font:inherit; padding:5px 10px; border:1px solid var(--border); border-radius:6px;
-        background:var(--card); color:var(--fg); flex:1; min-width:160px; }
-main { padding:16px 24px 60px; max-width:1100px; }
-.task { margin:22px 0; }
-.task > h2 { font-size:16px; margin:0 0 2px; }
-.cat { font-size:11px; font-weight:500; padding:1px 8px; border-radius:999px; background:var(--card);
-       border:1px solid var(--border); color:var(--muted); margin-left:8px; vertical-align:middle; }
-.task-desc { color:var(--muted); font-size:12.5px; margin:0 0 6px; }
-details.prompt { margin:6px 0 12px; }
-details.prompt summary { cursor:pointer; color:var(--accent); font-size:12.5px; }
-pre { background:var(--code); border:1px solid var(--border); border-radius:8px; padding:12px;
-      overflow-x:auto; white-space:pre-wrap; word-wrap:break-word; font:12.5px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; margin:6px 0; }
-.trial { border:1px solid var(--border); border-radius:10px; padding:12px 14px; margin:10px 0; background:var(--card); }
-.trial.hidden { display:none; }
-.row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
-.badge { font-weight:600; font-size:11px; padding:2px 9px; border-radius:999px; letter-spacing:.02em; }
-.b-pass { color:var(--pass); background:var(--passbg); }
-.b-fail { color:var(--fail); background:var(--failbg); }
-.b-refuse { color:var(--refuse); background:var(--refusebg); }
-.b-err { color:var(--err); background:var(--errbg); }
-.model { font-weight:600; }
-.meta { color:var(--muted); font-size:12px; }
-.detail { font-size:12.5px; margin-top:6px; }
-.detail .k { color:var(--muted); }
-.rubric { margin-top:6px; font-size:12.5px; }
-.rubric .chip { display:inline-block; margin:2px 6px 2px 0; padding:1px 8px; border-radius:6px;
-        background:var(--bg); border:1px solid var(--border); }
-.rubric .subchip { display:inline-block; margin:0 0 0 4px; padding:0 6px; border-radius:5px;
-        font-size:11px; color:var(--muted); background:var(--card); border:1px solid var(--border); }
-.rubric .rat { color:var(--muted); font-size:12px; margin:2px 0 0 2px; }
-details.resp summary { cursor:pointer; color:var(--accent); font-size:12.5px; margin-top:6px; }
-"""
-
-REPORT_JS = """
-const q=(s,r=document)=>[...r.querySelectorAll(s)];
-let mode='all', term='';
-function apply(){
-  q('.trial').forEach(t=>{
-    const st=t.dataset.status, txt=t.dataset.text;
-    let ok = mode==='all' || (mode==='fail'&&st==='fail') ||
-             (mode==='refuse'&&st==='refuse') || (mode==='problem'&&st!=='pass');
-    if(ok && term) ok = txt.includes(term);
-    t.classList.toggle('hidden', !ok);
-  });
-  q('.task').forEach(sec=>{
-    const any=q('.trial:not(.hidden)',sec).length>0;
-    sec.style.display = any ? '' : 'none';
-  });
-}
-document.addEventListener('DOMContentLoaded',()=>{
-  q('.controls button').forEach(b=>b.onclick=()=>{
-    q('.controls button').forEach(x=>x.classList.remove('on'));
-    b.classList.add('on'); mode=b.dataset.mode; apply();
-  });
-  const inp=document.getElementById('search');
-  inp.oninput=()=>{ term=inp.value.toLowerCase(); apply(); };
-  apply();
-});
-"""
-
-
-# Project mark: the feather lives in resources/featherbench.svg (one editable
-# source of truth, not markup buried in this module). It is read once and
-# INLINED into the report — both as the header logo and, base64-encoded, as the
-# favicon data: URI — so the rendered page stays a single self-contained file
-# with zero external asset requests. Loaded lazily and cached: importing eval.py
-# never needs the file; only rendering a report does.
-_REPORT_ICON_CACHE = None
-
-
+@functools.cache
 def report_icon():
-    """(svg_markup, favicon_data_uri) for the feather mark, read once from
-    resources/featherbench.svg. The markup is inlined into the header; the
-    base64 data: URI is the browser-tab favicon (CSS vars/links do not apply
-    there). Keeping the report self-contained means the SVG is embedded, not
-    linked — the separate file is the editable source, not a runtime fetch."""
-    global _REPORT_ICON_CACHE
-    if _REPORT_ICON_CACHE is None:
-        svg = (RESOURCES_DIR / "featherbench.svg").read_text().strip()
-        favicon = "data:image/svg+xml;base64," + base64.b64encode(svg.encode()).decode()
-        _REPORT_ICON_CACHE = (svg, favicon)
-    return _REPORT_ICON_CACHE
+    """(svg_markup, favicon_data_uri) for the feather mark, read once and cached
+    from resources/featherbench.svg (the editable source). Both are INLINED into
+    the report — markup as the header logo, base64 data: URI as the favicon — so
+    the page is self-contained with zero external asset requests. Loaded lazily."""
+    svg = (RESOURCES_DIR / "featherbench.svg").read_text().strip()
+    favicon = "data:image/svg+xml;base64," + base64.b64encode(svg.encode()).decode()
+    return (svg, favicon)
 
 
-# The report is one inline Jinja2 template rather than an f-string/`"".join`
-# HTML builder: autoescape=True escapes every `{{ }}` value, so a model answer
-# containing <script>, & or " renders as text, never live markup (issue #13) —
-# no per-value manual escaping to forget. It stays inline (not a separate .html)
-# to keep the single-file "read-it-in-one-sitting" property; CSS/JS are passed
-# in as trusted context vars marked `| safe`, so Jinja never parses their {}/}}
-# as delimiters and they need no escaping (they are first-party, never model
-# output). Static entities (&middot;, &mdash;) are literal template text and so
-# are emitted verbatim — Jinja only escapes interpolated `{{ }}` output.
-REPORT_TEMPLATE = """\
-<!doctype html>
-<html lang='en'>
-<head>
-<meta charset='utf-8'>
-<meta name='viewport' content='width=device-width,initial-scale=1'>
-<link rel='icon' href='{{ report_favicon }}'>
-<title>Featherbench eval report</title>
-<style>{{ report_css | safe }}</style>
-</head>
-<body>
-<header>
-<div class='brand'>{{ report_icon | safe }}<h1>Featherbench eval report</h1></div>
-<div class='sub'>Generated by Featherbench &middot; {{ stamp }} &middot; {{ n_trials }} trials across {{ n_tasks }} tasks. All models run through the same harness.</div>
-<div class='controls'>
-<button class='on' data-mode='all'>All</button>
-<button data-mode='problem'>Not passed</button>
-<button data-mode='fail'>Fails</button>
-<button data-mode='refuse'>Refusals</button>
-<input id='search' placeholder='search response text…'>
-</div>
-</header>
-<main>
-{% for task in tasks %}
-<section class='task' data-cat='{{ task.cat or "" }}'>
-<h2>{{ task.tid }}{% if task.cat %}<span class='cat'>{{ task.cat }}</span>{% endif %}<span class='meta'>{% if task.scored %} &middot; {{ task.passed }}/{{ task.scored }} passed{% endif %}</span></h2>
-{% if task.description %}<p class='task-desc'>{{ task.description }}</p>{% endif %}
-{% if task.prompt %}<details class='prompt'><summary>prompt</summary><pre>{{ task.prompt }}</pre></details>{% endif %}
-{% for t in task.trials %}
-<div class='trial' data-status='{{ t.status }}' data-text='{{ t.search_blob }}'>
-<div class='row'><span class='badge {{ t.cls }}'>{{ t.word }}</span><span class='model'>{{ t.model }}</span><span class='meta'>trial {{ t.trial_num }} &middot; {% for b in t.bits %}{% if not loop.first %} &middot; {% endif %}{{ b }}{% endfor %}</span></div>
-{% if t.error %}<div class='detail'><span class='k'>error:</span> {{ t.error }}</div>
-{% elif t.refusal %}<div class='detail'><span class='k'>refusal category:</span> {{ t.refusal_category }}</div>
-{% elif t.check_detail %}<div class='detail'><span class='k'>checker:</span> {{ t.check_detail }}</div>
-{% endif %}
-{% if t.tool_calls_rendered %}<div class='detail'><span class='k'>tool calls:</span> {{ t.tool_calls_rendered }}</div>
-{% endif %}
-{% if t.rubric %}<div class='rubric'><span class='k'>rubric</span> {% if t.rubric_mean is not none %}mean {{ "%.1f"|format(t.rubric_mean) }}{% endif %} {% for c in t.rubric %}<span class='chip'>{{ c.judge }}: {% if c.score is not none %}{{ c.score }}{% else %}&mdash;{% endif %}{% if c.scores %} {% for s in c.scores %}<span class='subchip'>{{ s }}</span>{% endfor %}{% endif %}</span>{% endfor %}{% for c in t.rubric %}{% if c.rationale %}<div class='rat'>{{ c.judge }}: {{ c.rationale }}</div>{% endif %}{% endfor %}</div>
-{% endif %}
-{% if t.text %}<details class='resp'><summary>response ({{ t.text_len }} chars)</summary><pre>{{ t.text }}</pre></details>
-{% endif %}
-</div>
-{% endfor %}
-</section>
-{% endfor %}
-</main>
-<script>{{ report_js | safe }}</script>
-</body>
-</html>
-"""
-
-# Compile the template once at import: autoescape=True is the whole point of the
-# refactor; trim_blocks/lstrip_blocks keep the {% %} control lines from bloating
-# the output with blank lines.
+# report.html.j2 / report.css / report.js live in resources/ as the editable
+# source of truth, read lazily and cached below. autoescape=True escapes every
+# interpolated `{{ }}` value, so untrusted model text renders as text, never live
+# markup. Trusted first-party CSS/JS are passed as `| safe` context vars (never
+# model output), so Jinja leaves their {}/}} alone and they need no escaping.
 _REPORT_ENV = jinja2.Environment(autoescape=True, trim_blocks=True, lstrip_blocks=True)
-_REPORT_TMPL = _REPORT_ENV.from_string(REPORT_TEMPLATE)
+
+
+@functools.cache
+def _report_asset(name):
+    """Text of a first-party report asset (report.css / report.js), read once
+    from resources/ and cached."""
+    return (RESOURCES_DIR / name).read_text()
+
+
+@functools.cache
+def _report_template():
+    """Compiled report template, read once from resources/report.html.j2 and
+    cached. Compiled via _REPORT_ENV.from_string(...), NOT a FileSystemLoader,
+    so autoescape stays on — a FileSystemLoader would silently disable it."""
+    return _REPORT_ENV.from_string(
+        (RESOURCES_DIR / "report.html.j2").read_text())
 
 
 def write_html_report(records, tasks_by_id, out_path=None):
     """Render one run's report.html: a self-contained, filterable review page.
 
-    Addresses the 'inspect the results file for ...' step every rubric-less task
-    leans on — groups every trial under its task, with pass/fail, refusals,
-    rubric scores + rationales, cost/latency, and the full response text one
-    click away. No external assets, so it opens straight from disk. out_path
-    defaults to results/report.html; the runner passes a per-run
-    results/report-<ts>.html.
-
-    Rendering is a single autoescaping Jinja2 template (REPORT_TEMPLATE): this
-    function only shapes plain data — no HTML strings — so every untrusted model
-    value is escaped by the template, not by a hand-placed escape call.
+    Groups every trial under its task — pass/fail, refusals, rubric scores +
+    rationales, cost/latency, and the full response text one click away. No
+    external assets, so it opens straight from disk. out_path defaults to
+    results/report.html; the runner passes a per-run results/report-<ts>.html.
     """
     out_path = out_path or (RESULTS_DIR / "report.html")
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     by_task = group_by(records, "task")
-    cats = task_categories()
-    tasks = [_task_data(tid, by_task[tid], tasks_by_id.get(tid, {}), cats)
+    tasks = [_task_data(tid, by_task[tid], tasks_by_id.get(tid, {}))
              for tid in sorted(by_task)]
     icon_svg, favicon = report_icon()
-    out_path.write_text(_REPORT_TMPL.render(
-        report_css=REPORT_CSS, report_js=REPORT_JS,
+    out_path.write_text(_report_template().render(
+        report_css=_report_asset("report.css"), report_js=_report_asset("report.js"),
         report_icon=icon_svg, report_favicon=favicon, stamp=stamp,
         n_trials=len(records), n_tasks=len({r["task"] for r in records}),
         tasks=tasks))
 
 
-def _task_data(tid, rs, task, cats):
-    """Plain-data shape for one task section (no markup) — the template turns it
-    into the <section>: header, category chip, passed/scored meta, optional
-    description + prompt, and one trial card per record."""
+def _task_data(tid, rs, task):
+    """Plain-data shape for one task section (no markup); the template renders it.
+    Category comes from the loaded task alone (single source of truth)."""
     passed, scored = pass_counts(rs)
     return {
         "tid": tid,
-        "cat": task.get("category") or cats.get(tid),
+        "cat": task.get("category") or "uncategorized",
         "passed": passed, "scored": scored,
         "description": task.get("description"),
         "prompt": task.get("prompt"),
@@ -1067,23 +878,23 @@ def _status(r):
 
 def _trial_data(r):
     """Plain-data shape for one trial card (no markup); data-status/data-text
-    drive the client-side filters. Every value here is raw — the template's
-    autoescape turns model text, tool-call names, refusal categories and rubric
-    rationales into escaped output, so none can inject markup."""
+    drive the client-side filters."""
     status, cls, word = _status(r)
     text = r.get("text") or ""
     call_names = " ".join(c.get("name") or "" for c in (r.get("tool_calls") or []))
     search_blob = (text + " " + (r.get("check_detail") or "") + " " + call_names).lower()
 
     bits = []
-    if r.get("latency_s") is not None:
-        bits.append(f"{r['latency_s']:.1f}s TTFT")
-    if r.get("wall_clock_s") is not None:
-        bits.append(f"{r['wall_clock_s']:.1f}s wall")
-    if r.get("output_tokens") is not None:
-        bits.append(f"{r['output_tokens']} out-tok")
-    if r.get("cost_usd") is not None:
-        bits.append(f"${r['cost_usd']:.4f}")
+    # (key, formatter) pairs guarded by "is not None" so a 0 value still renders.
+    for key, fmt in (
+        ("latency_s", lambda v: f"{v:.1f}s TTFT"),
+        ("wall_clock_s", lambda v: f"{v:.1f}s wall"),
+        ("output_tokens", lambda v: f"{v} out-tok"),
+        ("cost_usd", lambda v: f"${v:.4f}"),
+    ):
+        if r.get(key) is not None:
+            bits.append(fmt(r[key]))
+    # stop_reason keeps its truthiness guard so an empty string does not render.
     if r.get("stop_reason"):
         bits.append(f"stop:{r['stop_reason']}")
 
@@ -1109,7 +920,7 @@ def _trial_data(r):
         "search_blob": search_blob, "bits": bits,
         "error": r.get("error"),
         "refusal": r.get("refusal"),
-        "refusal_category": str(r.get("refusal_category")),
+        "refusal_category": r.get("refusal_category"),
         "check_detail": r.get("check_detail"),
         "tool_calls_rendered": tool_calls_rendered,
         "rubric": rubric, "rubric_mean": r.get("rubric_mean"),
@@ -1129,15 +940,54 @@ def refusal_verdict(task):
     pass/fail denominator — recorded, not scored — because for most tasks a
     refusal is neither the right answer nor a wrong one. A task may override:
     "refusal": "pass" for a prompt it *should* decline (a jailbreak), or "fail"
-    for a benign task it should not have ducked. Refusal handling is task-local
-    precisely because it is: a jailbreak that also asks a benign question (see
-    security-jailbreak-oppo) wants the benign answer, so a blanket rule is wrong.
+    for a benign task it should not have ducked.
     """
     disp = task.get("refusal", "neutral")
     if disp not in REFUSAL_DISPOSITIONS:
         raise ValueError(f"task {task.get('id')!r}: \"refusal\" must be one of "
                          f"pass/fail/neutral, got {disp!r}")
     return REFUSAL_DISPOSITIONS[disp], disp
+
+
+def _score_refusal(record, task, resp):
+    """Score a hard refusal into `record` in place (no return, no try/except).
+
+    Any exception here (e.g. an invalid task "refusal" disposition) propagates to
+    run_trial's error-trap — that boundary is what keeps run_trial never-raises.
+    """
+    passed, disp = refusal_verdict(task)
+    record["passed"] = passed
+    if disp != "neutral":
+        record["check_detail"] = f"refusal scored as {disp} (task refusal={disp})"
+    scored_as = {True: "PASS", False: "FAIL", None: "not scored"}[passed]
+    print(f"   REFUSED ({resp.refusal_category}) -> {scored_as}")
+
+
+def _score_answer(record, task, resp, judges):
+    """Score a non-refusal answer (checker + optional rubric) into `record` in place.
+
+    No return, no try/except — any checker/rubric failure propagates to run_trial's
+    error-trap. Reads exclude=record["model"] (== model_name, set at record
+    construction) to keep the issue's 4-arg signature.
+    """
+    passed, detail = run_checker(task, resp)
+    record["passed"] = passed
+    record["check_detail"] = detail
+    verdict = {True: "PASS", False: "FAIL", None: "DONE"}[passed]
+    # latency_s is now TTFT and is None for a content-less (e.g. tool-only) reply
+    ttft = f"{resp.latency_s:.1f}s" if resp.latency_s is not None else "n/a"
+    print(f"   {verdict}  ({ttft}, {resp.output_tokens} out-tokens)")
+    if task.get("rubric") and judges:
+        record["rubric"] = run_rubric(task, resp.text, judges)
+        # exclude the contestant's own self-score from its headline mean
+        record["rubric_mean"] = rubric_mean(record["rubric"], exclude=record["model"])
+        # aggregate the judges' costs into a SEPARATE field — never fold
+        # into record["cost_usd"] (the answer cost), which must stay the
+        # pristine per-model answer cost for cross-model comparison.
+        record["judge_cost_usd"] = round(
+            sum(s.get("cost_usd") or 0 for s in record["rubric"].values()), 6)
+        grid = ", ".join(f"{j}:{s.get('score')}" for j, s in record["rubric"].items())
+        print(f"   rubric {record['rubric_mean']}  ({grid})")
 
 
 def run_trial(run_id, task, model_name, cfg, trial, judges):
@@ -1151,34 +1001,12 @@ def run_trial(run_id, task, model_name, cfg, trial, judges):
               "model": model_name, "trial": trial,
               "timestamp": datetime.now(timezone.utc).isoformat()}
     try:
-        resp = call_with_retry(model_name, cfg, task["prompt"], task.get("tools"))
+        resp = call_with_retry(cfg, task["prompt"], task.get("tools"))
         record.update(asdict(resp))
         if resp.refusal:
-            passed, disp = refusal_verdict(task)
-            record["passed"] = passed
-            if disp != "neutral":
-                record["check_detail"] = f"refusal scored as {disp} (task refusal={disp})"
-            scored_as = {True: "PASS", False: "FAIL", None: "not scored"}[passed]
-            print(f"   REFUSED ({resp.refusal_category}) -> {scored_as}")
+            _score_refusal(record, task, resp)
         else:
-            passed, detail = run_checker(task, resp)
-            record["passed"] = passed
-            record["check_detail"] = detail
-            verdict = {True: "PASS", False: "FAIL", None: "DONE"}[passed]
-            # latency_s is now TTFT and is None for a content-less (e.g. tool-only) reply
-            ttft = f"{resp.latency_s:.1f}s" if resp.latency_s is not None else "n/a"
-            print(f"   {verdict}  ({ttft}, {resp.output_tokens} out-tokens)")
-            if task.get("rubric") and judges:
-                record["rubric"] = run_rubric(task, resp.text, judges)
-                # exclude the contestant's own self-score from its headline mean
-                record["rubric_mean"] = rubric_mean(record["rubric"], exclude=model_name)
-                # aggregate the judges' costs into a SEPARATE field — never fold
-                # into record["cost_usd"] (the answer cost), which must stay the
-                # pristine per-model answer cost for cross-model comparison (RUB-01).
-                record["judge_cost_usd"] = round(
-                    sum(s.get("cost_usd") or 0 for s in record["rubric"].values()), 6)
-                grid = ", ".join(f"{j}:{s.get('score')}" for j, s in record["rubric"].items())
-                print(f"   rubric {record['rubric_mean']}  ({grid})")
+            _score_answer(record, task, resp, judges)
         # cost_usd is already on the record via asdict(resp) — read from usage.cost
         # keep full text for later inspection, but cap runaway outputs
         record["text"] = (record.get("text") or "")[:200000]
@@ -1195,10 +1023,9 @@ def run_all_trials(work, run_id, judges, writer, concurrency):
     item.
 
     With concurrency > 1 the trials run in a thread pool, but writer is invoked
-    only on the calling thread (as each future completes), so it needs no lock
-    and each record still lands the moment its trial finishes — a mid-run crash
-    keeps everything already done. Order is completion order, not submission
-    order; records carry task/model/trial so that doesn't matter.
+    only on the calling thread (as each future completes), so it needs no lock and
+    each record lands as its trial finishes — a mid-run crash keeps what is done.
+    Order is completion order; records carry task/model/trial, so that is fine.
     """
     def one(item):
         task, (model_name, cfg), trial = item
@@ -1220,7 +1047,7 @@ def _load_records(path):
     The path is caller-supplied, so every line is parsed under its own
     try/except: a garbled, truncated or oversized line from a partially-written
     or hostile file is treated as an absent cell — never eval'd, never crashes the
-    loader (REL-02 / RESEARCH Security V5). Blank lines are skipped."""
+    loader. Blank lines are skipped."""
     records = []
     with open(path, encoding="utf-8") as fh:
         for line in fh:
@@ -1346,9 +1173,7 @@ def main():
 
     RESULTS_DIR.mkdir(exist_ok=True)
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    # A fresh file per run: the summary and report below are built from just this
-    # run's records, so editing a task's prompt or checker between runs can never
-    # blend old trials into the new aggregates.
+    # A fresh file per run so the summary/report below never blend trials across runs.
     results_file = RESULTS_DIR / f"results-{run_id}.jsonl"
     summary_file = RESULTS_DIR / f"summary-{run_id}.md"
     report_file = RESULTS_DIR / f"report-{run_id}.html"
@@ -1358,8 +1183,7 @@ def main():
     # --resume / --rerun-errored: keep the already-completed cells and run only
     # what is left. The kept records seed a FRESH results-<ts>.jsonl (kept + new)
     # so the one-file-per-coherent-run invariant holds and the summary/report
-    # cover the full matrix. A changed task (different task_hash) is stale and is
-    # re-run, never reused as a success (remaining_work, the fidelity guard).
+    # cover the full matrix (stale changed-task cells re-run — see remaining_work).
     seed_records = []
     if resume_path:
         mode = "rerun-errored" if args.rerun_errored else "resume"
@@ -1380,8 +1204,9 @@ def main():
             records.append(record)
         run_all_trials(work, run_id, judges, writer, args.concurrency)
 
-    write_summary(records, summary_file)
-    write_html_report(records, {t["id"]: t for t in tasks}, report_file)
+    tasks_by_id = {t["id"]: t for t in tasks}
+    write_summary(records, tasks_by_id, summary_file)
+    write_html_report(records, tasks_by_id, report_file)
     print(f"\nWrote {results_file}, {summary_file} and {report_file}")
 
 
