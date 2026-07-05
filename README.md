@@ -1,4 +1,4 @@
-# ![Featherbench logo](https://raw.githubusercontent.com/ed-is-ai/featherbench/main/resources/featherbench.svg) Featherbench
+# <img src="resources/featherbench.svg" alt="Featherbench logo" width="38" align="top"> Featherbench
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue.svg)](pyproject.toml)
@@ -7,18 +7,19 @@
 [![Models via OpenRouter](https://img.shields.io/badge/models-OpenRouter-6467f2.svg)](https://openrouter.ai)
 
 **Find the cheapest, smallest, fastest model that is still good enough for _your_ workload.**
-
-Picking a model is now a cost-and-latency decision as much as a capability one.
+More and more people are waking up to the fact that LLMs are expensive.
 The pressure is to minimize tokens, spend, and latency by running the *smallest*
 model that still clears your bar — and "good enough" is defined by your own
-application, not a public leaderboard. The open question is rarely "which model
-is best in the abstract"; it's "is this cheaper, smaller model good enough for
-the tasks *I* actually run?"
+application, not a public leaderboard. 
 
-Vendor-reported benchmark numbers can't answer that. They're produced on
-different harnesses, with different prompts and settings, so they don't line up
-head-to-head — and they measure their tasks, not yours. Featherbench closes the
-gap: you write your own real-world tasks as small JSON files and run every model
+The open question is rarely answered by generic benchmarks, 
+the question I get asked "is this cheaper, smaller model good enough for
+the tasks *I* actually run?"  
+
+Vendor-reported benchmarks promise much, but prevalent benchmark-maxxing means we
+should not blindly trust them.
+
+Featherbench closes the gap: you write your own real-world tasks as small JSON files and run every model
 you select through **one shared scaffold** — same prompt, same pass/fail
 checkers, same effort settings, same latency clock, same cost math. Pass rate,
 Cost (USD), and latency come out **directly comparable** across models, so you
@@ -34,6 +35,9 @@ Every model is reached through one routing-pinned
 [OpenRouter](https://openrouter.ai) integration — one API, one key, comparable
 cost and latency for every model — and each run lands as JSONL, a Markdown
 summary, and a self-contained HTML review page.
+
+OpenRouter is a perfect place to run these evals as it gives access to all models, 
+without prejudice, and without having to sign up for numerous accounts.
 
 **Design goals — why "featherweight":**
 
