@@ -29,7 +29,7 @@
 <div class='trial' data-status='{{ t.status }}' data-text='{{ t.search_blob }}'>
 <div class='row'><span class='badge {{ t.cls }}'>{{ t.word }}</span><span class='model'>{{ t.model }}</span><span class='meta'>trial {{ t.trial_num }} &middot; {% for b in t.bits %}{% if not loop.first %} &middot; {% endif %}{{ b }}{% endfor %}</span></div>
 {% if t.error %}<div class='detail'><span class='k'>error:</span> {{ t.error }}</div>
-{% elif t.refusal %}<div class='detail'><span class='k'>refusal category:</span> {{ t.refusal_category }}</div>
+{% elif t.refusal %}<div class='detail'><span class='k'>refusal{% if t.refusal_category %} category:{% endif %}</span>{% if t.refusal_category %} {{ t.refusal_category }}{% endif %}</div>
 {% elif t.check_detail %}<div class='detail'><span class='k'>checker:</span> {{ t.check_detail }}</div>
 {% endif %}
 {% if t.tool_calls_rendered %}<div class='detail'><span class='k'>tool calls:</span> {{ t.tool_calls_rendered }}</div>

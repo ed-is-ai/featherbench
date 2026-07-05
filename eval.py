@@ -114,6 +114,14 @@ def build_request(cfg, prompt, tools=None):
     return kwargs, extra_body, sampling_sent
 
 
+def _json_args(raw):
+    """Tool-call arguments arrive as a JSON string; tolerate malformed ones."""
+    try:
+        return json.loads(raw or "{}")
+    except (ValueError, TypeError):
+        return {}
+
+
 def reduce_stream(chunks, t0, now=time.monotonic):
     """PURE: fold an OpenRouter chat stream into the fields ModelResponse needs.
 
@@ -253,14 +261,6 @@ def call_with_retry(cfg, prompt, tools=None, retries=4, base_delay=2.0):
             time.sleep(wait)
 
 
-def _json_args(raw):
-    """Tool-call arguments arrive as a JSON string; tolerate malformed ones."""
-    try:
-        return json.loads(raw or "{}")
-    except (ValueError, TypeError):
-        return {}
-
-
 # ---------------------------------------------------------------- checkers
 #
 # A checker is a function (spec, text, tool_calls) -> (passed, detail),
@@ -318,7 +318,7 @@ def check_tool_called(spec, text, tool_calls):
         got = call.get("arguments") or {}
         if want is None or all(_arg_match(got.get(k), v, mode) for k, v in want.items()):
             return True, f"called {name}" + (f" with {want}" if want else "")
-    return False, f"no matching call to {name}({spec.get('args') or ''})"
+    return False, f"no matching call to {name}({want or ''})"
 
 
 def _arg_match(got, want, mode="substring"):
@@ -920,7 +920,7 @@ def _trial_data(r):
         "search_blob": search_blob, "bits": bits,
         "error": r.get("error"),
         "refusal": r.get("refusal"),
-        "refusal_category": str(r.get("refusal_category")),
+        "refusal_category": r.get("refusal_category"),
         "check_detail": r.get("check_detail"),
         "tool_calls_rendered": tool_calls_rendered,
         "rubric": rubric, "rubric_mean": r.get("rubric_mean"),

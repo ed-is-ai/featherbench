@@ -527,6 +527,16 @@ class TestReports(unittest.TestCase):
         self.assertIn("M20.24 12.24", page)  # feather path from resources/featherbench.svg
         self.assertIn("rel='icon' href='data:image/svg+xml;base64,", page)
 
+    def test_html_report_categoryless_refusal_omits_none(self):
+        # A hard refusal carrying NO refusal_category must render a plain refusal
+        # label — never the literal "None" the old str(None) produced (issue #25).
+        recs = [{"run_id": "r", "trial": 1, "task": "t-refuse2", "model": "m3",
+                 "refusal": True, "passed": None, "text": ""}]
+        harness.write_html_report(recs, {})
+        page = (harness.RESULTS_DIR / "report.html").read_text()
+        self.assertIn("REFUSED", page)
+        self.assertNotIn("category:</span> None", page)
+
     def test_html_report_renders_per_criterion_scores(self):
         recs = [
             {"run_id": "r", "trial": 1, "task": "t-rub", "model": "m1",
