@@ -246,10 +246,10 @@ class TestRubric(unittest.TestCase):
     def test_run_rubric_caps_answer_before_judging(self):
         task = {"prompt": "p", "rubric": {"criteria": ["c"]}}
         seen = {}
-        def fake(name, cfg, prompt, tools=None):
+        def fake(cfg, prompt, tools=None):
             seen["prompt"] = prompt
             return ModelResponse(text='{"scores": [5], "rationale": "r"}')
-        with mock.patch.object(harness, "call_model", side_effect=fake):
+        with mock.patch.object(harness, "call_openrouter", side_effect=fake):
             harness.run_rubric(task, "X" * 200_000, {"j": {}})
         self.assertLess(len(seen["prompt"]), harness.JUDGE_ANSWER_CAP + 2000)
         self.assertNotIn("X" * 50_000, seen["prompt"])
@@ -259,10 +259,10 @@ class TestRubric(unittest.TestCase):
         # scores-array index maps unambiguously to criterion i
         task = {"prompt": "p", "rubric": {"criteria": ["clarity", "depth"]}}
         seen = {}
-        def fake(name, cfg, prompt, tools=None):
+        def fake(cfg, prompt, tools=None):
             seen["prompt"] = prompt
             return ModelResponse(text='{"scores": [6, 8], "rationale": "r"}')
-        with mock.patch.object(harness, "call_model", side_effect=fake):
+        with mock.patch.object(harness, "call_openrouter", side_effect=fake):
             harness.run_rubric(task, "ans", {"j": {}})
         self.assertIn("1. clarity", seen["prompt"])
         self.assertIn("2. depth", seen["prompt"])
@@ -273,7 +273,7 @@ class TestRubric(unittest.TestCase):
         # call's real cost rides on the returned dict (RUB-01)
         reply = ModelResponse(text='Sure.\n{"scores": [7], "rationale": "decent"}',
                               cost_usd=0.002)
-        with mock.patch.object(harness, "call_model", return_value=reply):
+        with mock.patch.object(harness, "call_openrouter", return_value=reply):
             out = harness._judge_once("j", {}, "p", 1)
         self.assertEqual(out["score"], 7)
         self.assertEqual(out["scores"], [7])
@@ -282,7 +282,7 @@ class TestRubric(unittest.TestCase):
 
     def test_judge_once_mean_of_criteria(self):
         reply = ModelResponse(text='{"scores": [6, 8], "rationale": "ok"}')
-        with mock.patch.object(harness, "call_model", return_value=reply):
+        with mock.patch.object(harness, "call_openrouter", return_value=reply):
             out = harness._judge_once("j", {}, "p", 2)
         self.assertEqual(out["score"], 7.0)          # mean of 6 and 8
         self.assertEqual(out["scores"], [6, 8])
@@ -291,7 +291,7 @@ class TestRubric(unittest.TestCase):
         # a reply with the wrong number of scores must not crash the trial, but
         # the judge call still cost money, so cost_usd is still reported (RUB-01)
         reply = ModelResponse(text='{"scores": [6, 8], "rationale": "ok"}', cost_usd=0.004)
-        with mock.patch.object(harness, "call_model", return_value=reply):
+        with mock.patch.object(harness, "call_openrouter", return_value=reply):
             out = harness._judge_once("j", {}, "p", 3)   # expected 3, got 2
         self.assertIsNone(out["score"])
         self.assertIn("error", out)
@@ -300,7 +300,7 @@ class TestRubric(unittest.TestCase):
 
     def test_judge_once_no_json_degrades(self):
         reply = ModelResponse(text="I think it is pretty good, no JSON here.")
-        with mock.patch.object(harness, "call_model", return_value=reply):
+        with mock.patch.object(harness, "call_openrouter", return_value=reply):
             out = harness._judge_once("j", {}, "p", 1)
         self.assertIsNone(out["score"])
         self.assertIn("error", out)
@@ -308,13 +308,13 @@ class TestRubric(unittest.TestCase):
     def test_judge_once_non_integer_degrades(self):
         # non-integer content in the scores array falls through to score=None
         reply = ModelResponse(text='{"scores": ["good"], "rationale": "x"}')
-        with mock.patch.object(harness, "call_model", return_value=reply):
+        with mock.patch.object(harness, "call_openrouter", return_value=reply):
             out = harness._judge_once("j", {}, "p", 1)
         self.assertIsNone(out["score"])
         self.assertIn("error", out)
 
     def test_judge_once_exception_degrades(self):
-        with mock.patch.object(harness, "call_model", side_effect=RuntimeError("boom")):
+        with mock.patch.object(harness, "call_openrouter", side_effect=RuntimeError("boom")):
             out = harness._judge_once("j", {}, "p", 1)
         self.assertIsNone(out["score"])
         self.assertIn("boom", out["error"])
@@ -322,23 +322,6 @@ class TestRubric(unittest.TestCase):
 
 
 class TestProvidersAndSelection(unittest.TestCase):
-    def test_single_path_routes_through_call_openrouter(self):
-        # every model now goes through the one call_openrouter path; there is no
-        # (provider, api) registry left to dispatch on.
-        sentinel = ModelResponse(text="routed")
-        cfg = {"model": "openai/gpt-5.5", "provider_order": ["openai"]}
-        with mock.patch.object(harness, "call_openrouter", return_value=sentinel) as co:
-            resp = harness.call_model("m", cfg, "hi")
-        self.assertIs(resp, sentinel)
-        co.assert_called_once_with(cfg, "hi", None)
-        for gone in ("PROVIDERS", "provider", "_client_kwargs", "cost_usd"):
-            self.assertFalse(hasattr(harness, gone), f"{gone} should be removed")
-        # the three direct-SDK provider fns are gone too (names built from parts so
-        # this file carries no literal reference to the retired symbols)
-        for suffix in ("anthropic", "openai_responses", "openai_chat"):
-            self.assertFalse(hasattr(harness, "call_" + suffix),
-                             f"call_{suffix} should be removed")
-
     def test_is_rate_limit(self):
         class RateLimitError(Exception):
             status_code = 429
@@ -350,26 +333,26 @@ class TestProvidersAndSelection(unittest.TestCase):
         class RateLimitError(Exception):
             status_code = 429
         ok = ModelResponse(text="ok")
-        with mock.patch.object(harness, "call_model",
+        with mock.patch.object(harness, "call_openrouter",
                                side_effect=[RateLimitError(), RateLimitError(), ok]), \
              mock.patch("time.sleep") as sleep, mock.patch("builtins.print"):
-            resp = harness.call_with_retry("m", {}, "p")
+            resp = harness.call_with_retry({}, "p")
         self.assertIs(resp, ok)
         self.assertEqual(sleep.call_count, 2)
 
     def test_call_with_retry_reraises_after_giving_up(self):
         class RateLimitError(Exception):
             status_code = 429
-        with mock.patch.object(harness, "call_model", side_effect=RateLimitError()), \
+        with mock.patch.object(harness, "call_openrouter", side_effect=RateLimitError()), \
              mock.patch("time.sleep"), mock.patch("builtins.print"):
             with self.assertRaises(RateLimitError):
-                harness.call_with_retry("m", {}, "p", retries=2)
+                harness.call_with_retry({}, "p", retries=2)
 
     def test_call_with_retry_does_not_retry_other_errors(self):
-        with mock.patch.object(harness, "call_model", side_effect=ValueError("nope")) as cm, \
+        with mock.patch.object(harness, "call_openrouter", side_effect=ValueError("nope")) as cm, \
              mock.patch("time.sleep"):
             with self.assertRaises(ValueError):
-                harness.call_with_retry("m", {}, "p")
+                harness.call_with_retry({}, "p")
         self.assertEqual(cm.call_count, 1)  # no retries on non-rate-limit errors
 
     def test_is_transient(self):
@@ -401,10 +384,10 @@ class TestProvidersAndSelection(unittest.TestCase):
         class ServerError(Exception):
             status_code = 503
         ok = ModelResponse(text="ok")
-        with mock.patch.object(harness, "call_model",
+        with mock.patch.object(harness, "call_openrouter",
                                side_effect=[ServerError(), ok]) as cm, \
              mock.patch("time.sleep") as sleep, mock.patch("builtins.print"):
-            resp = harness.call_with_retry("m", {}, "p")
+            resp = harness.call_with_retry({}, "p")
         self.assertIs(resp, ok)
         self.assertEqual(cm.call_count, 2)
         self.assertEqual(sleep.call_count, 1)
@@ -414,10 +397,10 @@ class TestProvidersAndSelection(unittest.TestCase):
         # loudly and immediately, never be masked as a transient retry.
         class NotFound(Exception):
             status_code = 404
-        with mock.patch.object(harness, "call_model", side_effect=NotFound()) as cm, \
+        with mock.patch.object(harness, "call_openrouter", side_effect=NotFound()) as cm, \
              mock.patch("time.sleep") as sleep:
             with self.assertRaises(NotFound):
-                harness.call_with_retry("m", {}, "p")
+                harness.call_with_retry({}, "p")
         self.assertEqual(cm.call_count, 1)   # a single attempt, no retry
         self.assertEqual(sleep.call_count, 0)
 
@@ -601,7 +584,7 @@ class TestRunTrial(unittest.TestCase):
     def run_with(self, resp_or_exc):
         kw = ({"side_effect": resp_or_exc} if isinstance(resp_or_exc, Exception)
               else {"return_value": resp_or_exc})
-        with mock.patch.object(harness, "call_model", **kw), mock.patch("builtins.print"):
+        with mock.patch.object(harness, "call_openrouter", **kw), mock.patch("builtins.print"):
             return harness.run_trial("rid", self.TASK, "m", {}, 1, None)
 
     def test_pass_and_fail(self):
@@ -628,7 +611,7 @@ class TestRunTrial(unittest.TestCase):
         resp = ModelResponse(refusal=True, refusal_category="cat",
                              stop_reason="refusal", latency_s=1.0)
         def run(task):
-            with mock.patch.object(harness, "call_model", return_value=resp), \
+            with mock.patch.object(harness, "call_openrouter", return_value=resp), \
                  mock.patch("builtins.print"):
                 return harness.run_trial("rid", dict(task, prompt="p"), "m", {}, 1, None)
         self.assertIs(run({"id": "t", "refusal": "pass"})["passed"], True)
@@ -658,7 +641,7 @@ class TestRunTrial(unittest.TestCase):
                                latency_s=1.0, output_tokens=10)
         j1 = ModelResponse(text='{"scores": [7], "rationale": "a"}', cost_usd=0.002)
         j2 = ModelResponse(text='{"scores": [9], "rationale": "b"}', cost_usd=0.003)
-        with mock.patch.object(harness, "call_model", side_effect=[answer, j1, j2]), \
+        with mock.patch.object(harness, "call_openrouter", side_effect=[answer, j1, j2]), \
              mock.patch("builtins.print"):
             rec = harness.run_trial("rid", task, "m", {}, 1, {"j1": {}, "j2": {}})
         self.assertAlmostEqual(rec["judge_cost_usd"], 0.005)   # 0.002 + 0.003

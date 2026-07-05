@@ -199,15 +199,6 @@ def call_openrouter(cfg, prompt, tools=None):
         sampling_sent=sampling_sent)
 
 
-def call_model(name, cfg, prompt, tools=None):
-    """Route a model through the single OpenRouter path.
-
-    Timing is owned by call_openrouter (only the stream sees the first content
-    token), so — unlike the old dispatcher — nothing is stamped here.
-    """
-    return call_openrouter(cfg, prompt, tools)
-
-
 def _is_rate_limit(exc):
     """True for rate-limit / 429 errors, without importing any provider SDK.
 
@@ -251,8 +242,8 @@ def _is_transient(exc):
     return _is_rate_limit(exc)  # message-only rate limits (no status) stay transient
 
 
-def call_with_retry(name, cfg, prompt, tools=None, retries=4, base_delay=2.0):
-    """call_model with exponential backoff on transient errors only.
+def call_with_retry(cfg, prompt, tools=None, retries=4, base_delay=2.0):
+    """call_openrouter with exponential backoff on transient errors only.
 
     A full-catalog x N-trials run reliably hits 429s and the occasional 5xx /
     connection reset / read timeout; without this each becomes an error record and
@@ -261,12 +252,12 @@ def call_with_retry(name, cfg, prompt, tools=None, retries=4, base_delay=2.0):
     a routing-pin 404) are re-raised immediately so a mislabeled-model
     misconfiguration fails loudly instead of being masked. Backoff is jittered
     (base_delay * 2**attempt + uniform(0, base_delay)) to avoid a thundering herd
-    under --concurrency > 1. Latency is measured per attempt inside call_model, so
+    under --concurrency > 1. Latency is measured per attempt inside call_openrouter, so
     the recorded latency_s reflects the successful call, not the waits.
     """
     for attempt in range(retries + 1):
         try:
-            return call_model(name, cfg, prompt, tools)
+            return call_openrouter(cfg, prompt, tools)
         except Exception as exc:
             if attempt >= retries or not _is_transient(exc):
                 raise
@@ -545,7 +536,7 @@ def _judge_once(judge_name, cfg, prompt, n_criteria):
     """
     resp = None
     try:
-        resp = call_with_retry(judge_name, cfg, prompt)
+        resp = call_with_retry(cfg, prompt)
         reply = resp.text or ""
         m = re.search(r"\{.*\}", reply, re.S)
         if not m:
@@ -1040,7 +1031,7 @@ def run_trial(run_id, task, model_name, cfg, trial, judges):
               "model": model_name, "trial": trial,
               "timestamp": datetime.now(timezone.utc).isoformat()}
     try:
-        resp = call_with_retry(model_name, cfg, task["prompt"], task.get("tools"))
+        resp = call_with_retry(cfg, task["prompt"], task.get("tools"))
         record.update(asdict(resp))
         if resp.refusal:
             passed, disp = refusal_verdict(task)
