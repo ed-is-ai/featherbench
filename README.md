@@ -17,7 +17,7 @@ summary, and a self-contained HTML review page.
 **Design goals — why "featherweight":**
 
 - **One file, no framework lock-in.** [`eval.py`](eval.py) is ~1,050 lines of
-  plain Python with two dependencies (`anthropic`, `openai`) — everything else
+  plain Python with two dependencies (`openai`, `jinja2`) — everything else
   is the standard library. Read it in one sitting; fork it without ceremony.
 - **Tasks are data, not code.** A task is a JSON file. Non-engineers can author
   them; they diff cleanly in review.
@@ -38,7 +38,7 @@ this is that.
 ## Setup
 
 ```sh
-pip3 install anthropic openai
+pip3 install openai jinja2
 
 export ANTHROPIC_API_KEY=sk-ant-...   # or `ant auth login` — the SDK picks up the profile
 export OPENAI_API_KEY=sk-...
