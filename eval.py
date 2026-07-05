@@ -705,10 +705,11 @@ def _overall_section(by_model):
     for model in sorted(by_model):
         rs = by_model[model]
         passed, scored = pass_counts(rs)
-        rubs = [r["rubric_mean"] for r in rs if r.get("rubric_mean") is not None]
-        lats = [r["latency_s"] for r in rs if r.get("latency_s") is not None]
-        costs = [r["cost_usd"] for r in rs if r.get("cost_usd") is not None]
-        judge_costs = [r["judge_cost_usd"] for r in rs if r.get("judge_cost_usd") is not None]
+        vals = lambda k: [r[k] for r in rs if r.get(k) is not None]
+        rubs = vals("rubric_mean")
+        lats = vals("latency_s")
+        costs = vals("cost_usd")
+        judge_costs = vals("judge_cost_usd")
         rows.append([
             model, len(rs), passed, scored - passed,
             sum(1 for r in rs if r.get("refusal")),
@@ -884,14 +885,16 @@ def _trial_data(r):
     search_blob = (text + " " + (r.get("check_detail") or "") + " " + call_names).lower()
 
     bits = []
-    if r.get("latency_s") is not None:
-        bits.append(f"{r['latency_s']:.1f}s TTFT")
-    if r.get("wall_clock_s") is not None:
-        bits.append(f"{r['wall_clock_s']:.1f}s wall")
-    if r.get("output_tokens") is not None:
-        bits.append(f"{r['output_tokens']} out-tok")
-    if r.get("cost_usd") is not None:
-        bits.append(f"${r['cost_usd']:.4f}")
+    # (key, formatter) pairs guarded by "is not None" so a 0 value still renders.
+    for key, fmt in (
+        ("latency_s", lambda v: f"{v:.1f}s TTFT"),
+        ("wall_clock_s", lambda v: f"{v:.1f}s wall"),
+        ("output_tokens", lambda v: f"{v} out-tok"),
+        ("cost_usd", lambda v: f"${v:.4f}"),
+    ):
+        if r.get(key) is not None:
+            bits.append(fmt(r[key]))
+    # stop_reason keeps its truthiness guard so an empty string does not render.
     if r.get("stop_reason"):
         bits.append(f"stop:{r['stop_reason']}")
 
