@@ -949,6 +949,47 @@ def refusal_verdict(task):
     return REFUSAL_DISPOSITIONS[disp], disp
 
 
+def _score_refusal(record, task, resp):
+    """Score a hard refusal into `record` in place (no return, no try/except).
+
+    Any exception here (e.g. an invalid task "refusal" disposition) propagates to
+    run_trial's error-trap — that boundary is what keeps run_trial never-raises.
+    """
+    passed, disp = refusal_verdict(task)
+    record["passed"] = passed
+    if disp != "neutral":
+        record["check_detail"] = f"refusal scored as {disp} (task refusal={disp})"
+    scored_as = {True: "PASS", False: "FAIL", None: "not scored"}[passed]
+    print(f"   REFUSED ({resp.refusal_category}) -> {scored_as}")
+
+
+def _score_answer(record, task, resp, judges):
+    """Score a non-refusal answer (checker + optional rubric) into `record` in place.
+
+    No return, no try/except — any checker/rubric failure propagates to run_trial's
+    error-trap. Reads exclude=record["model"] (== model_name, set at record
+    construction) to keep the issue's 4-arg signature.
+    """
+    passed, detail = run_checker(task, resp)
+    record["passed"] = passed
+    record["check_detail"] = detail
+    verdict = {True: "PASS", False: "FAIL", None: "DONE"}[passed]
+    # latency_s is now TTFT and is None for a content-less (e.g. tool-only) reply
+    ttft = f"{resp.latency_s:.1f}s" if resp.latency_s is not None else "n/a"
+    print(f"   {verdict}  ({ttft}, {resp.output_tokens} out-tokens)")
+    if task.get("rubric") and judges:
+        record["rubric"] = run_rubric(task, resp.text, judges)
+        # exclude the contestant's own self-score from its headline mean
+        record["rubric_mean"] = rubric_mean(record["rubric"], exclude=record["model"])
+        # aggregate the judges' costs into a SEPARATE field — never fold
+        # into record["cost_usd"] (the answer cost), which must stay the
+        # pristine per-model answer cost for cross-model comparison.
+        record["judge_cost_usd"] = round(
+            sum(s.get("cost_usd") or 0 for s in record["rubric"].values()), 6)
+        grid = ", ".join(f"{j}:{s.get('score')}" for j, s in record["rubric"].items())
+        print(f"   rubric {record['rubric_mean']}  ({grid})")
+
+
 def run_trial(run_id, task, model_name, cfg, trial, judges):
     """Run one (task, model, trial): call, check, judge, price.
 
@@ -963,31 +1004,9 @@ def run_trial(run_id, task, model_name, cfg, trial, judges):
         resp = call_with_retry(cfg, task["prompt"], task.get("tools"))
         record.update(asdict(resp))
         if resp.refusal:
-            passed, disp = refusal_verdict(task)
-            record["passed"] = passed
-            if disp != "neutral":
-                record["check_detail"] = f"refusal scored as {disp} (task refusal={disp})"
-            scored_as = {True: "PASS", False: "FAIL", None: "not scored"}[passed]
-            print(f"   REFUSED ({resp.refusal_category}) -> {scored_as}")
+            _score_refusal(record, task, resp)
         else:
-            passed, detail = run_checker(task, resp)
-            record["passed"] = passed
-            record["check_detail"] = detail
-            verdict = {True: "PASS", False: "FAIL", None: "DONE"}[passed]
-            # latency_s is now TTFT and is None for a content-less (e.g. tool-only) reply
-            ttft = f"{resp.latency_s:.1f}s" if resp.latency_s is not None else "n/a"
-            print(f"   {verdict}  ({ttft}, {resp.output_tokens} out-tokens)")
-            if task.get("rubric") and judges:
-                record["rubric"] = run_rubric(task, resp.text, judges)
-                # exclude the contestant's own self-score from its headline mean
-                record["rubric_mean"] = rubric_mean(record["rubric"], exclude=model_name)
-                # aggregate the judges' costs into a SEPARATE field — never fold
-                # into record["cost_usd"] (the answer cost), which must stay the
-                # pristine per-model answer cost for cross-model comparison.
-                record["judge_cost_usd"] = round(
-                    sum(s.get("cost_usd") or 0 for s in record["rubric"].values()), 6)
-                grid = ", ".join(f"{j}:{s.get('score')}" for j, s in record["rubric"].items())
-                print(f"   rubric {record['rubric_mean']}  ({grid})")
+            _score_answer(record, task, resp, judges)
         # cost_usd is already on the record via asdict(resp) — read from usage.cost
         # keep full text for later inspection, but cap runaway outputs
         record["text"] = (record.get("text") or "")[:200000]

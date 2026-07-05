@@ -646,6 +646,18 @@ class TestRunTrial(unittest.TestCase):
         self.assertAlmostEqual(rec["judge_cost_usd"], 0.005)   # 0.002 + 0.003
         self.assertEqual(rec["cost_usd"], 0.05)                # answer cost untouched
 
+    def test_scoring_helper_exception_becomes_error_record(self):
+        # the model call succeeds but a downstream scorer raises: run_trial's
+        # error-trap must still wrap the extracted _score_answer helper (INV-1).
+        answer = ModelResponse(text="x", latency_s=1.0, output_tokens=1)
+        with mock.patch.object(harness, "call_openrouter", return_value=answer), \
+             mock.patch.object(harness, "run_checker",
+                               side_effect=RuntimeError("checker boom")), \
+             mock.patch("builtins.print"):
+            rec = harness.run_trial("rid", self.TASK, "m", {}, 1, None)
+        self.assertEqual(rec["error"], "RuntimeError: checker boom")
+        self.assertIsNone(rec["passed"])
+
 
 class TestRunAllTrials(unittest.TestCase):
     WORK = [(f"task{i}", ("m", {}), 1) for i in range(6)]
