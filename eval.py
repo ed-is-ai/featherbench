@@ -595,16 +595,10 @@ def load_tasks(task_filter):
     return tasks
 
 
-def task_categories():
-    """Map task id -> category by scanning tasks/ (for the summary rollup)."""
-    cats = {}
-    for f in TASKS_DIR.glob("*.json"):
-        try:
-            d = json.loads(f.read_text())
-        except ValueError:
-            continue
-        cats[d.get("id", f.stem)] = d.get("category", "uncategorized")
-    return cats
+def categories_by_id(tasks_by_id):
+    """Derive task id -> category from the already-loaded tasks (single source of
+    truth) — no re-scan of tasks/ at report time. Resolves issue #18's ambiguity."""
+    return {tid: (t.get("category") or "uncategorized") for tid, t in tasks_by_id.items()}
 
 
 def select_models(spec, catalog):
@@ -705,7 +699,7 @@ def _mixed_hash_tasks(records):
     return {t: hs for t, hs in by_task.items() if len(hs) > 1}
 
 
-def write_summary(records, out_path=None):
+def write_summary(records, tasks_by_id, out_path=None):
     """Aggregate one run's records into a summary markdown file.
 
     out_path defaults to results/summary.md; the runner passes a per-run
@@ -713,6 +707,7 @@ def write_summary(records, out_path=None):
     guard below still fires if a caller hands in records that span task
     versions (e.g. several run files concatenated by hand)."""
     out_path = out_path or (RESULTS_DIR / "summary.md")
+    cats = categories_by_id(tasks_by_id)
     by_model = group_by(records, "model")
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     lines = ["# Eval summary", "",
@@ -729,7 +724,7 @@ def write_summary(records, out_path=None):
                   "prompt/checker versions in results.jsonl — the summary blends them")
     lines += _overall_section(by_model)
     lines += _per_task_section(records, by_model)
-    lines += _category_section(records, by_model)
+    lines += _category_section(records, by_model, cats)
     lines += _bias_section(records)
     out_path.write_text("\n".join(lines) + "\n")
 
@@ -785,9 +780,8 @@ def _per_task_section(records, by_model):
     return ["", "## Per task", ""] + md_table(["Task"] + models, rows)
 
 
-def _category_section(records, by_model):
+def _category_section(records, by_model, cats):
     """Pass rate rolled up by task category (tool-use / realworld / coding / ...)."""
-    cats = task_categories()
     models = sorted(by_model)
     names = sorted({cats.get(r["task"], "uncategorized") for r in records})
     if not names:
@@ -898,8 +892,7 @@ def write_html_report(records, tasks_by_id, out_path=None):
     out_path = out_path or (RESULTS_DIR / "report.html")
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     by_task = group_by(records, "task")
-    cats = task_categories()
-    tasks = [_task_data(tid, by_task[tid], tasks_by_id.get(tid, {}), cats)
+    tasks = [_task_data(tid, by_task[tid], tasks_by_id.get(tid, {}))
              for tid in sorted(by_task)]
     icon_svg, favicon = report_icon()
     out_path.write_text(_report_template().render(
@@ -909,14 +902,15 @@ def write_html_report(records, tasks_by_id, out_path=None):
         tasks=tasks))
 
 
-def _task_data(tid, rs, task, cats):
+def _task_data(tid, rs, task):
     """Plain-data shape for one task section (no markup) — the template turns it
     into the <section>: header, category chip, passed/scored meta, optional
-    description + prompt, and one trial card per record."""
+    description + prompt, and one trial card per record. Category comes from the
+    loaded task alone (single source of truth)."""
     passed, scored = pass_counts(rs)
     return {
         "tid": tid,
-        "cat": task.get("category") or cats.get(tid),
+        "cat": task.get("category") or "uncategorized",
         "passed": passed, "scored": scored,
         "description": task.get("description"),
         "prompt": task.get("prompt"),
@@ -1252,8 +1246,9 @@ def main():
             records.append(record)
         run_all_trials(work, run_id, judges, writer, args.concurrency)
 
-    write_summary(records, summary_file)
-    write_html_report(records, {t["id"]: t for t in tasks}, report_file)
+    tasks_by_id = {t["id"]: t for t in tasks}
+    write_summary(records, tasks_by_id, summary_file)
+    write_html_report(records, tasks_by_id, report_file)
     print(f"\nWrote {results_file}, {summary_file} and {report_file}")
 
 

@@ -475,7 +475,7 @@ class TestReports(unittest.TestCase):
         harness.RESULTS_DIR = Path(tmp.name)
 
     def test_summary(self):
-        harness.write_summary(FIXTURE_RECORDS)
+        harness.write_summary(FIXTURE_RECORDS, {})
         md = (harness.RESULTS_DIR / "summary.md").read_text()
         self.assertIn("| m1 | 2 | 1 | 0 | 1 | 0 | 100% [", md)  # pass/refusal tallies + CI
         self.assertIn("| m2 | 2 | 0 | 1 | 0 | 1 | 0% [", md)    # fail/error tallies + CI
@@ -497,14 +497,14 @@ class TestReports(unittest.TestCase):
         recs = [dict(FIXTURE_RECORDS[0], task_hash="aaaaaaaaaaaa"),
                 dict(FIXTURE_RECORDS[0], task_hash="bbbbbbbbbbbb")]
         with mock.patch("builtins.print"):  # suppress the console warning
-            harness.write_summary(recs)
+            harness.write_summary(recs, {})
         md = (harness.RESULTS_DIR / "summary.md").read_text()
         self.assertIn("Mixed task versions", md)
         self.assertIn("t-code", md)
 
     def test_summary_no_warning_for_single_version(self):
         recs = [dict(r, task_hash="samehash1234") for r in FIXTURE_RECORDS]
-        harness.write_summary(recs)
+        harness.write_summary(recs, {})
         self.assertNotIn("Mixed task versions", (harness.RESULTS_DIR / "summary.md").read_text())
 
     def test_html_report_renders_and_escapes(self):
