@@ -36,6 +36,7 @@ import jinja2
 import json
 import math
 import os
+import random
 import re
 import statistics
 import subprocess
@@ -220,23 +221,57 @@ def _is_rate_limit(exc):
     return "ratelimit" in type(exc).__name__.lower() or "rate limit" in str(exc).lower()
 
 
-def call_with_retry(name, cfg, prompt, tools=None, retries=4, base_delay=2.0):
-    """call_model with exponential backoff on rate-limit errors only.
+_TRANSIENT_STATUS = {429, 500, 502, 503, 504}
 
-    A full-catalog x N-trials run reliably hits 429s; without this each becomes an
-    error record and silently thins the dataset. Non-rate-limit errors (bad
-    request, auth, provider down) are re-raised immediately — retrying them just
-    wastes time. Latency is measured per attempt inside call_model, so the
-    recorded latency_s reflects the successful call, not the waits.
+
+def _is_transient(exc):
+    """True for retryable transient failures, without importing any provider SDK.
+
+    A flaky provider blip — a 429 rate limit, a 5xx (500/502/503/504), a dropped
+    connection or a read timeout — is worth retrying: it is not the model being
+    wrong, just the pipe. Read the status the same SDK-free way as _is_rate_limit
+    (off the exc or its .response) and match the connection/timeout families by
+    type name / message so openai's APIConnectionError / APITimeoutError retry
+    without an import.
+
+    Deliberately EXCLUDES every other 4xx — 400/401/403/404/422. In particular a
+    404 is the require_parameters:true routing-pin miss (a mislabeled-model
+    misconfiguration): it must fail loudly and immediately, never be masked as a
+    transient retry, or the benchmark scores an endpoint that is not the one
+    labeled. This is the fidelity guard (REL-01)."""
+    status = getattr(exc, "status_code", None) or getattr(
+        getattr(exc, "response", None), "status_code", None)
+    if status in _TRANSIENT_STATUS:
+        return True
+    if status is not None:
+        return False  # a concrete non-transient status (4xx) must fail loudly
+    blob = (type(exc).__name__ + " " + str(exc)).lower()
+    if "connection" in blob or "timeout" in blob:
+        return True
+    return _is_rate_limit(exc)  # message-only rate limits (no status) stay transient
+
+
+def call_with_retry(name, cfg, prompt, tools=None, retries=4, base_delay=2.0):
+    """call_model with exponential backoff on transient errors only.
+
+    A full-catalog x N-trials run reliably hits 429s and the occasional 5xx /
+    connection reset / read timeout; without this each becomes an error record and
+    silently thins the dataset. Only transient failures (429, 5xx, connection,
+    timeout) are retried — non-transient errors (bad request, auth, and above all
+    a routing-pin 404) are re-raised immediately so a mislabeled-model
+    misconfiguration fails loudly instead of being masked. Backoff is jittered
+    (base_delay * 2**attempt + uniform(0, base_delay)) to avoid a thundering herd
+    under --concurrency > 1. Latency is measured per attempt inside call_model, so
+    the recorded latency_s reflects the successful call, not the waits.
     """
     for attempt in range(retries + 1):
         try:
             return call_model(name, cfg, prompt, tools)
         except Exception as exc:
-            if attempt >= retries or not _is_rate_limit(exc):
+            if attempt >= retries or not _is_transient(exc):
                 raise
-            wait = base_delay * 2 ** attempt
-            print(f"   rate-limited ({type(exc).__name__}); "
+            wait = base_delay * 2 ** attempt + random.uniform(0, base_delay)
+            print(f"   transient error ({type(exc).__name__}); "
                   f"retry {attempt + 1}/{retries} in {wait:.0f}s", flush=True)
             time.sleep(wait)
 
@@ -294,24 +329,36 @@ def check_all(spec, text, tool_calls):
 
 @checker("tool_called")
 def check_tool_called(spec, text, tool_calls):
-    """PASS if some tool call matches `tool` (and every arg in `args`, if given)."""
+    """PASS if some tool call matches `tool` (and every arg in `args`, if given).
+
+    `arg_match` selects how each arg is compared: "substring" (default, loose),
+    "exact" (normalized equality) or "word" (word-boundary). Default stays loose so
+    existing tool tasks (location~=Paris, destination~=Tokyo) keep passing."""
     name, want = spec["tool"], spec.get("args")
+    mode = spec.get("arg_match", "substring")
     for call in tool_calls:
         if call.get("name") != name:
             continue
         got = call.get("arguments") or {}
-        if want is None or all(_arg_match(got.get(k), v) for k, v in want.items()):
+        if want is None or all(_arg_match(got.get(k), v, mode) for k, v in want.items()):
             return True, f"called {name}" + (f" with {want}" if want else "")
     return False, f"no matching call to {name}({spec.get('args') or ''})"
 
 
-def _arg_match(got, want):
-    """Loose match: `want` normalized is a substring of `got` normalized.
+def _arg_match(got, want, mode="substring"):
+    """Compare a tool-call arg `got` against the wanted `want` under `mode`.
 
-    Tolerates 'Paris' matching a model that answered 'Paris, France', and
-    coerces numbers/enums to strings so 2 matches "2".
+    substring (default): `want` normalized is a substring of `got` normalized —
+      tolerates 'Paris' matching 'Paris, France'; coerces numbers so 2 matches "2".
+    exact: normalized equality — 'Tokyo' no longer matches 'Tokyostan', '2' not '20'.
+    word: word-boundary match — 'Tokyo' matches 'to Tokyo' but not 'Tokyostan'.
     """
-    return str(want).strip().lower() in str(got).strip().lower()
+    g, w = str(got).strip().lower(), str(want).strip().lower()
+    if mode == "exact":
+        return g == w
+    if mode == "word":
+        return re.search(r"\b" + re.escape(w) + r"\b", g) is not None
+    return w in g
 
 
 @checker("tool_not_called")
@@ -329,8 +376,39 @@ def check_contains(spec, text, tool_calls):
 
 @checker("not_contains")
 def check_not_contains(spec, text, tool_calls):
-    found = [v for v in _wanted_values(spec) if _value_present(spec, v, text)]
+    present = _negation_aware_present if spec.get("negation_aware") else _value_present
+    found = [v for v in _wanted_values(spec) if present(spec, v, text)]
     return (not found), (f"forbidden term present: {found!r}" if found else "ok")
+
+
+# Negation cue immediately before a banned term, allowing only light filler between:
+# a bare cue word (no|not|without|never|avoid|omit|skip) or a "*-free"/"free from" token.
+_NEG_CUE = re.compile(
+    r"(?:\b(?:no|not|without|never|avoid|omit|skip)\b|[\w-]*free\b)[\s-]*(?:\w+\s+){0,2}$",
+    re.I)
+
+
+def _negation_aware_present(spec, value, text):
+    """Opt-in ("negation_aware": true) presence test that does NOT count a banned
+    term as present when it is negated: either the term itself carries a
+    "-free"/" free" suffix ("bacon-free"), or a negation cue immediately governs it
+    ("no bacon", "without bacon", "fish-free Worcestershire"). A cue only shields a
+    term across light filler and never across a comma/period, so "no salt, then add
+    bacon" still counts bacon. Returns True iff at least one AFFIRMATIVE occurrence
+    exists. (whole_word tasks keep exact semantics on the default, opted-out path.)"""
+    low, val = text.lower(), value.lower()
+    n, start = len(val), 0
+    while True:
+        i = low.find(val, start)
+        if i == -1:
+            return False  # no affirmative occurrence found
+        start = i + n
+        if re.match(r"[\s-]*free\b", low[i + n:i + n + 8]):
+            continue  # value itself is "<term>-free" / "<term> free"
+        segment = re.split(r"[.,;:()]", low[max(0, i - 30):i])[-1]
+        if _NEG_CUE.search(segment):
+            continue  # a negation cue immediately governs this occurrence
+        return True
 
 
 def _wanted_values(spec):
@@ -351,6 +429,10 @@ def _value_present(spec, value, text):
 def check_regex(spec, text, tool_calls):
     ok = re.search(spec["pattern"], text, re.S) is not None
     label = spec.get("label", spec["pattern"])
+    if spec.get("negate"):
+        # opt-in "pattern must be ABSENT": pass when the pattern is NOT found.
+        ok = not ok
+        return ok, ("absent" if ok else f"forbidden pattern present: {label}")
     return ok, ("matched" if ok else f"no match: {label}")
 
 
@@ -417,9 +499,11 @@ answer, not a bad one.
 {criteria}
 </rubric>
 
-Score the answer 1-10 against the rubric (10 = excellent on every criterion, \
-1 = fails almost all of them). Reply with ONLY a JSON object, no other text:
-{{"score": <integer 1-10>, "rationale": "<one sentence>"}}"""
+Score the answer 1-10 on EACH numbered rubric criterion above, in order \
+(10 = excellent on that criterion, 1 = fails it). Reply with ONLY a JSON \
+object, no other text:
+{{"scores": [<integer 1-10>, ...], "rationale": "<one sentence>"}}
+The `scores` array must hold exactly one integer per criterion, in the same order."""
 
 
 JUDGE_ANSWER_CAP = 40000  # chars (~8k tokens); rubric answers are prose — this only trims runaways
@@ -439,23 +523,48 @@ def run_rubric(task, answer, judges):
     answer = answer or ""
     if len(answer) > JUDGE_ANSWER_CAP:
         answer = answer[:JUDGE_ANSWER_CAP] + "\n…[answer truncated for judging]"
-    criteria = "\n".join("- " + c for c in task["rubric"]["criteria"])
+    crit_list = task["rubric"]["criteria"]
+    criteria = "\n".join(f"{i}. {c}" for i, c in enumerate(crit_list, 1))
     prompt = JUDGE_PROMPT.format(task_prompt=task["prompt"], answer=answer, criteria=criteria)
-    return {name: _judge_once(name, cfg, prompt) for name, cfg in judges.items()}
+    return {name: _judge_once(name, cfg, prompt, len(crit_list)) for name, cfg in judges.items()}
 
 
-def _judge_once(judge_name, cfg, prompt):
+def _judge_once(judge_name, cfg, prompt, n_criteria):
+    """One judge scores the answer per criterion. Returns
+    {score: mean, scores: [ints], rationale} on success, else {score: None, error}.
+
+    The judge reply is untrusted LLM JSON: keep the re.search + json.loads guard
+    and validate that the scores array has exactly one entry per criterion. A
+    malformed, wrong-length, or non-integer reply degrades to score=None with an
+    error rather than raising inside run_trial (a bad judge must not kill a trial).
+
+    The judge call's real cost (resp.cost_usd, read from usage.cost) is carried on
+    every returned dict so run_trial can aggregate a separate judge_cost_usd — the
+    cost was spent even when the reply is unparseable (RUB-01). Only a call that
+    never returned (the except branch) has unknown cost -> None.
+    """
+    resp = None
     try:
-        reply = call_with_retry(judge_name, cfg, prompt).text or ""
+        resp = call_with_retry(judge_name, cfg, prompt)
+        reply = resp.text or ""
         m = re.search(r"\{.*\}", reply, re.S)
         if not m:
-            return {"score": None, "error": "no JSON in judge reply"}
+            return {"score": None, "error": "no JSON in judge reply",
+                    "cost_usd": resp.cost_usd}
         data = json.loads(m.group(0))
-        score = data.get("score")
-        return {"score": int(score) if score is not None else None,
-                "rationale": str(data.get("rationale", ""))[:300]}
+        scores = data.get("scores")
+        if not isinstance(scores, list) or len(scores) != n_criteria:
+            return {"score": None,
+                    "error": f"expected {n_criteria} criterion scores, got {scores!r}"[:200],
+                    "cost_usd": resp.cost_usd}
+        ints = [int(s) for s in scores]  # non-integer content raises -> degrades below
+        mean = round(sum(ints) / len(ints), 2)
+        return {"score": mean, "scores": ints,
+                "rationale": str(data.get("rationale", ""))[:300],
+                "cost_usd": resp.cost_usd}
     except Exception as e:
-        return {"score": None, "error": f"{type(e).__name__}: {e}"[:200]}
+        return {"score": None, "error": f"{type(e).__name__}: {e}"[:200],
+                "cost_usd": resp.cost_usd if resp is not None else None}
 
 
 def rubric_mean(scores, exclude=None):
@@ -641,6 +750,7 @@ def _overall_section(by_model):
         rubs = [r["rubric_mean"] for r in rs if r.get("rubric_mean") is not None]
         lats = [r["latency_s"] for r in rs if r.get("latency_s") is not None]
         costs = [r["cost_usd"] for r in rs if r.get("cost_usd") is not None]
+        judge_costs = [r["judge_cost_usd"] for r in rs if r.get("judge_cost_usd") is not None]
         rows.append([
             model, len(rs), passed, scored - passed,
             sum(1 for r in rs if r.get("refusal")),
@@ -650,13 +760,19 @@ def _overall_section(by_model):
             f"{statistics.median(lats):.1f}" if lats else "—",
             sum(r.get("output_tokens") or 0 for r in rs),
             f"{sum(costs):.2f}" if costs else "n/a",
+            f"{sum(judge_costs):.2f}" if judge_costs else "—",
         ])
     header = ["Model", "Trials", "Pass", "Fail", "Refusals", "Errors", "Pass rate (95% CI)",
-              "Rubric /10", "Median TTFT (s)", "Total out-tokens", "Cost (USD)"]
+              "Rubric /10", "Median TTFT (s)", "Total out-tokens", "Cost (USD)",
+              "Judge cost (USD)"]
     return md_table(header, rows) + [
         "", "Pass rate is over Pass+Fail (refusals and errors excluded); the "
         "bracket is the 95% Wilson interval. Wide intervals mean too few trials "
         "to conclude anything — raise `--trials`.",
+        "", "Cost (USD) is the pristine per-model answer cost. Judge cost (USD) is "
+        "what it cost to GRADE that contestant's answers (every judge scoring this "
+        "model's rubric trials) — kept separate so rubric runs are cost-honest "
+        "without corrupting the answer-cost comparison; it is blank for non-rubric runs.",
         "", "Median TTFT is time-to-first-content-token (reasoning/thinking deltas "
         "are excluded, so a long-thinking model is not penalised for latency it "
         "spends reasoning); total wall-clock per trial is recorded on each record "
@@ -769,6 +885,8 @@ pre { background:var(--code); border:1px solid var(--border); border-radius:8px;
 .rubric { margin-top:6px; font-size:12.5px; }
 .rubric .chip { display:inline-block; margin:2px 6px 2px 0; padding:1px 8px; border-radius:6px;
         background:var(--bg); border:1px solid var(--border); }
+.rubric .subchip { display:inline-block; margin:0 0 0 4px; padding:0 6px; border-radius:5px;
+        font-size:11px; color:var(--muted); background:var(--card); border:1px solid var(--border); }
 .rubric .rat { color:var(--muted); font-size:12px; margin:2px 0 0 2px; }
 details.resp summary { cursor:pointer; color:var(--accent); font-size:12.5px; margin-top:6px; }
 """
@@ -870,7 +988,7 @@ REPORT_TEMPLATE = """\
 {% endif %}
 {% if t.tool_calls_rendered %}<div class='detail'><span class='k'>tool calls:</span> {{ t.tool_calls_rendered }}</div>
 {% endif %}
-{% if t.rubric %}<div class='rubric'><span class='k'>rubric</span> {% if t.rubric_mean is not none %}mean {{ "%.1f"|format(t.rubric_mean) }}{% endif %} {% for c in t.rubric %}<span class='chip'>{{ c.judge }}: {% if c.score is not none %}{{ c.score }}{% else %}&mdash;{% endif %}</span>{% endfor %}{% for c in t.rubric %}{% if c.rationale %}<div class='rat'>{{ c.judge }}: {{ c.rationale }}</div>{% endif %}{% endfor %}</div>
+{% if t.rubric %}<div class='rubric'><span class='k'>rubric</span> {% if t.rubric_mean is not none %}mean {{ "%.1f"|format(t.rubric_mean) }}{% endif %} {% for c in t.rubric %}<span class='chip'>{{ c.judge }}: {% if c.score is not none %}{{ c.score }}{% else %}&mdash;{% endif %}{% if c.scores %} {% for s in c.scores %}<span class='subchip'>{{ s }}</span>{% endfor %}{% endif %}</span>{% endfor %}{% for c in t.rubric %}{% if c.rationale %}<div class='rat'>{{ c.judge }}: {{ c.rationale }}</div>{% endif %}{% endfor %}</div>
 {% endif %}
 {% if t.text %}<details class='resp'><summary>response ({{ t.text_len }} chars)</summary><pre>{{ t.text }}</pre></details>
 {% endif %}
@@ -978,7 +1096,10 @@ def _trial_data(r):
 
     rubric = None
     if r.get("rubric"):
+        # pass through the per-criterion breakdown when present; guard for its
+        # absence so historical records (single aggregate score) still render.
         rubric = [{"judge": judge, "score": s.get("score"),
+                   "scores": s.get("scores"),
                    "rationale": s.get("rationale") or s.get("error")}
                   for judge, s in r["rubric"].items()]
 
@@ -1051,6 +1172,11 @@ def run_trial(run_id, task, model_name, cfg, trial, judges):
                 record["rubric"] = run_rubric(task, resp.text, judges)
                 # exclude the contestant's own self-score from its headline mean
                 record["rubric_mean"] = rubric_mean(record["rubric"], exclude=model_name)
+                # aggregate the judges' costs into a SEPARATE field — never fold
+                # into record["cost_usd"] (the answer cost), which must stay the
+                # pristine per-model answer cost for cross-model comparison (RUB-01).
+                record["judge_cost_usd"] = round(
+                    sum(s.get("cost_usd") or 0 for s in record["rubric"].values()), 6)
                 grid = ", ".join(f"{j}:{s.get('score')}" for j, s in record["rubric"].items())
                 print(f"   rubric {record['rubric_mean']}  ({grid})")
         # cost_usd is already on the record via asdict(resp) — read from usage.cost
@@ -1087,6 +1213,81 @@ def run_all_trials(work, run_id, judges, writer, concurrency):
             writer(one(item))
 
 
+def _load_records(path):
+    """Read a prior results-<ts>.jsonl (one JSON record per line) for --resume /
+    --rerun-errored.
+
+    The path is caller-supplied, so every line is parsed under its own
+    try/except: a garbled, truncated or oversized line from a partially-written
+    or hostile file is treated as an absent cell — never eval'd, never crashes the
+    loader (REL-02 / RESEARCH Security V5). Blank lines are skipped."""
+    records = []
+    with open(path, encoding="utf-8") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                records.append(json.loads(line))
+            except (ValueError, TypeError):
+                continue  # a garbled line is an absent cell, not a crash
+    return records
+
+
+def _ledger_index(prior_records):
+    """Map (task, task_hash, model, trial) -> the latest prior record for that
+    key, de-duping duplicates (e.g. from an earlier resume) by timestamp so a
+    later re-run of a cell supersedes its earlier record."""
+    index = {}
+    for rec in prior_records:
+        key = (rec.get("task"), rec.get("task_hash"), rec.get("model"), rec.get("trial"))
+        cur = index.get(key)
+        if cur is None or (rec.get("timestamp") or "") >= (cur.get("timestamp") or ""):
+            index[key] = rec
+    return index
+
+
+def remaining_work(prior_records, work, mode):
+    """PURE selection for --resume / --rerun-errored (no I/O — records passed in).
+
+    `work` is the itertools.product list of (task, (model_name, cfg), trial). For
+    each item the CURRENT-hash key is (task_id, task_hash(task), model, trial),
+    with task_hash recomputed from the CURRENT task — the fidelity guard: a
+    changed task produces a different key, so its stale prior record (under the
+    OLD hash) never matches and the cell is re-run, never reused as a success.
+
+    Returns (to_run, kept): the work-items still to run, and the prior records to
+    seed into the fresh combined results file so the summary/report reflect the
+    full matrix. Only cells inside `work` (the requested tasks x models x trials)
+    are ever kept or skipped; records outside the matrix are ignored, never
+    resurrected.
+
+    resume — a cell is DONE (skipped, its prior record kept) iff its current-hash
+    key has a prior record with NO error; missing, errored and stale cells re-run.
+    rerun-errored — to_run is exactly the cells whose latest prior record HAS an
+    error; every non-errored in-matrix prior record is kept. (Missing cells are
+    not "errored cells" and are left out — use --resume to fill gaps.)
+    """
+    index = _ledger_index(prior_records)
+    to_run, kept = [], []
+    for item in work:
+        task, (model_name, _cfg), trial = item
+        prior = index.get((task["id"], task_hash(task), model_name, trial))
+        if mode == "rerun-errored":
+            if prior is None:
+                continue                     # not an errored cell; skip entirely
+            if prior.get("error"):
+                to_run.append(item)          # errored -> re-run
+            else:
+                kept.append(prior)           # non-errored -> keep as-is
+        else:  # resume
+            if prior is not None and not prior.get("error"):
+                kept.append(prior)           # done without error -> reuse
+            else:
+                to_run.append(item)          # missing / errored / stale -> re-run
+    return to_run, kept
+
+
 def parse_args():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -1104,6 +1305,15 @@ def parse_args():
     ap.add_argument("--no-rubric", action="store_true",
                     help="skip LLM rubric judging even on tasks that define a rubric")
     ap.add_argument("--dry-run", action="store_true", help="list what would run, then exit")
+    resume = ap.add_mutually_exclusive_group()
+    resume.add_argument("--resume", metavar="FILE",
+                        help="resume from a prior results-<ts>.jsonl: skip cells already "
+                        "completed without error (keyed on task+task_hash+model+trial) and "
+                        "re-run only missing, errored or changed-task (stale) cells. Point "
+                        "--models/--tasks/--trials at the same intended matrix.")
+    resume.add_argument("--rerun-errored", metavar="FILE", dest="rerun_errored",
+                        help="re-run only the errored cells from a prior results-<ts>.jsonl, "
+                        "keeping every non-errored prior record. Writes a fresh combined file.")
     return ap.parse_args()
 
 
@@ -1116,6 +1326,9 @@ def main():
         sys.exit(f"nothing to run: {len(models)} models, {len(tasks)} tasks selected")
     if args.concurrency < 1:
         sys.exit("--concurrency must be >= 1")
+    resume_path = args.resume or args.rerun_errored
+    if resume_path and not os.path.isfile(resume_path):  # fail fast on a bad path
+        sys.exit(f"--resume/--rerun-errored: no such results file: {resume_path}")
     for t in tasks:  # fail fast on a bad "refusal" disposition, not mid-run
         try:
             refusal_verdict(t)
@@ -1142,8 +1355,25 @@ def main():
     judges = None if args.no_rubric else models
 
     work = list(itertools.product(tasks, models.items(), range(1, args.trials + 1)))
-    records = []
+    # --resume / --rerun-errored: keep the already-completed cells and run only
+    # what is left. The kept records seed a FRESH results-<ts>.jsonl (kept + new)
+    # so the one-file-per-coherent-run invariant holds and the summary/report
+    # cover the full matrix. A changed task (different task_hash) is stale and is
+    # re-run, never reused as a success (remaining_work, the fidelity guard).
+    seed_records = []
+    if resume_path:
+        mode = "rerun-errored" if args.rerun_errored else "resume"
+        prior = _load_records(resume_path)
+        work, seed_records = remaining_work(prior, work, mode)
+        print(f"{mode} from {resume_path}: {len(seed_records)} cell(s) kept, "
+              f"{len(work)} to run")
+
+    records = list(seed_records)
     with results_file.open("w") as out:
+        for rec in seed_records:  # seed the fresh combined file with the kept records
+            out.write(json.dumps(rec) + "\n")
+        out.flush()
+
         def writer(record):
             out.write(json.dumps(record) + "\n")
             out.flush()

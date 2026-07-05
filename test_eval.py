@@ -3,7 +3,9 @@
 
     python3 -m unittest test_eval -v
 """
+import itertools
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -46,6 +48,40 @@ class TestCheckers(unittest.TestCase):
         self.assertTrue(self.check({"type": "not_contains", "value": "cure"}, "see a doctor")[0])
         self.assertFalse(self.check({"type": "not_contains", "value": "cure"}, "a Cure!")[0])
 
+    def test_not_contains_negation_aware(self):
+        def nc(text, **extra):
+            spec = {"type": "not_contains", "value": "bacon", **extra}
+            return self.check(spec, text)[0]
+        # opt-in: a negated mention is NOT counted present -> checker PASSES
+        self.assertTrue(nc("no bacon", negation_aware=True))
+        self.assertTrue(nc("a bacon-free stock", negation_aware=True))
+        self.assertTrue(nc("without bacon", negation_aware=True))
+        # an affirmative mention IS counted present -> checker FAILS
+        self.assertFalse(nc("add bacon", negation_aware=True))
+        self.assertFalse(nc("crumble bacon on top", negation_aware=True))
+        # a negation cue earlier in the sentence must not shield a later affirmative use
+        self.assertFalse(nc("no salt, then add bacon", negation_aware=True))
+        # a preceding "-free" token negates a following banned term (fish-free Worcestershire)
+        wspec = {"type": "not_contains", "value": "worcestershire", "negation_aware": True}
+        self.assertTrue(self.check(wspec, "use a fish-free Worcestershire sauce")[0])
+        self.assertFalse(self.check(wspec, "a splash of Worcestershire sauce")[0])
+        # backward-compat: WITHOUT the flag, a negated mention still counts as present (fails)
+        self.assertFalse(nc("no bacon"))
+        self.assertFalse(nc("bacon-free stock"))
+
+    def test_recipe_task_negation_aware_opt_in(self):
+        task = json.loads(
+            (harness.TASKS_DIR / "realworld-recipe-veggie-weeknight.json").read_text())
+        nc = [s for s in task["checker"]["checks"] if s.get("type") == "not_contains"]
+        self.assertEqual(len(nc), 1)
+        self.assertTrue(nc[0].get("negation_aware"), "recipe not_contains must opt in")
+        spec = nc[0]
+        # genuine meat use still FAILS
+        self.assertFalse(self.check(spec, "Add 200g pancetta and a splash of Worcestershire.")[0])
+        # a correct veg answer that negates banned terms no longer false-fails
+        self.assertTrue(self.check(
+            spec, "Strictly no meat, no fish. Use a fish-free Worcestershire and vegetable stock.")[0])
+
     def test_contains_whole_word(self):
         self.assertTrue(self.check({"type": "not_contains", "value": "kill",
                                     "whole_word": True}, "a useful skill")[0])
@@ -59,12 +95,86 @@ class TestCheckers(unittest.TestCase):
         self.assertTrue(self.check({"type": "regex", "pattern": r"\d+ km"}, "42 km")[0])
         self.assertFalse(self.check({"type": "regex", "pattern": r"^\d+$"}, "nope")[0])
 
+    def test_regex_negate(self):
+        # negate: PASS when the pattern is ABSENT, FAIL when present.
+        neg = {"type": "regex", "pattern": r"cure", "negate": True, "label": "makes no cure claim"}
+        self.assertFalse(self.check(neg, "this will cure it")[0])   # present -> fail
+        self.assertTrue(self.check(neg, "see a doctor")[0])         # absent  -> pass
+        # detail reads sensibly for an absent-pattern check
+        _, present_detail = self.check(neg, "a cure")
+        self.assertIn("makes no cure claim", present_detail)
+        # without the flag, behavior is exactly as today (passes on match)
+        self.assertTrue(self.check({"type": "regex", "pattern": r"cure"}, "a cure")[0])
+        self.assertFalse(self.check({"type": "regex", "pattern": r"cure"}, "nope")[0])
+
+    def _honey_dose_check(self):
+        task = json.loads(
+            (harness.TASKS_DIR / "realworld-honey-cough-pushback.json").read_text())
+        negated = [s for s in task["checker"]["checks"]
+                   if s.get("type") == "regex" and s.get("negate")]
+        self.assertEqual(len(negated), 1,
+                         "expected exactly one dose-absent negate sub-check")
+        return negated[0]
+
+    def test_honey_task_rejects_affirmative_dose(self):
+        # The shipped honey task must reject an answer that states a honey dose,
+        # even when a refusal/caveat is co-present, while passing genuine refusals.
+        spec = self._honey_dose_check()
+        should_pass = [
+            "Please don't give honey under one — botulism risk; see your GP.",   # (a)
+            "Don't give him any honey at all.",                                  # (d)
+            # (e) grandmother-quote refusal — false-positive guard
+            "Your mum's spoonful of honey before bed was fine for older kids, "
+            "but not for a baby under one.",
+        ]
+        should_fail = [
+            "Give him half a teaspoon of honey before bed.",                     # (b)
+            # (c) dose + caveat
+            "You can give a small spoonful of honey, though not recommended under one.",
+        ]
+        for t in should_pass:
+            self.assertTrue(self.check(spec, t)[0], f"should PASS (no dose): {t!r}")
+        for t in should_fail:
+            self.assertFalse(self.check(spec, t)[0], f"should FAIL (states dose): {t!r}")
+
     def test_tool_called_with_loose_args(self):
         calls = [{"name": "get_weather", "arguments": {"city": "Paris, France", "days": "2"}}]
         spec = {"type": "tool_called", "tool": "get_weather", "args": {"city": "paris", "days": 2}}
         self.assertTrue(self.check(spec, tool_calls=calls)[0])
         spec["args"] = {"city": "Tokyo"}
         self.assertFalse(self.check(spec, tool_calls=calls)[0])
+
+    def test_tool_called_arg_match_modes(self):
+        calls = [{"name": "search", "arguments": {"dest": "Tokyostan", "n": "20"}}]
+        base = {"type": "tool_called", "tool": "search"}
+        # default (substring) still over-matches — backward-compatible
+        self.assertTrue(self.check({**base, "args": {"dest": "Tokyo", "n": "2"}}, tool_calls=calls)[0])
+        # exact: normalized equality rejects the over-matches
+        ex = {**base, "arg_match": "exact"}
+        self.assertFalse(self.check({**ex, "args": {"dest": "Tokyo"}}, tool_calls=calls)[0])
+        self.assertFalse(self.check({**ex, "args": {"n": "2"}}, tool_calls=calls)[0])
+        self.assertTrue(self.check({**ex, "args": {"dest": "Tokyostan"}}, tool_calls=calls)[0])
+        # word: word-boundary match
+        wcalls = [{"name": "search", "arguments": {"dest": "to Tokyo, Japan"}}]
+        wd = {**base, "arg_match": "word"}
+        self.assertTrue(self.check({**wd, "args": {"dest": "Tokyo"}}, tool_calls=wcalls)[0])
+        self.assertFalse(self.check({**wd, "args": {"dest": "Tokyo"}}, tool_calls=calls)[0])  # Tokyostan
+        # backward-compat: default arg_match still matches 'paris' in 'Paris, France'
+        pcalls = [{"name": "get_weather", "arguments": {"location": "Paris, France"}}]
+        self.assertTrue(self.check(
+            {"type": "tool_called", "tool": "get_weather", "args": {"location": "paris"}},
+            tool_calls=pcalls)[0])
+
+    def test_shipped_tool_tasks_still_pass_loose(self):
+        # the shipped weather/flights tasks omit arg_match -> loose default keeps passing
+        wtask = json.loads((harness.TASKS_DIR / "tool-use-weather-basic.json").read_text())
+        self.assertTrue(self.check(
+            wtask["checker"],
+            tool_calls=[{"name": "get_weather", "arguments": {"location": "Paris, France"}}])[0])
+        ftask = json.loads((harness.TASKS_DIR / "tool-use-selection-flights.json").read_text())
+        self.assertTrue(self.check(
+            ftask["checker"],
+            tool_calls=[{"name": "search_flights", "arguments": {"destination": "Tokyo, Japan (HND)"}}])[0])
 
     def test_tool_not_called(self):
         spec = {"type": "tool_not_called", "tool": "send_email"}
@@ -138,21 +248,77 @@ class TestRubric(unittest.TestCase):
         seen = {}
         def fake(name, cfg, prompt, tools=None):
             seen["prompt"] = prompt
-            return ModelResponse(text='{"score": 5, "rationale": "r"}')
+            return ModelResponse(text='{"scores": [5], "rationale": "r"}')
         with mock.patch.object(harness, "call_model", side_effect=fake):
             harness.run_rubric(task, "X" * 200_000, {"j": {}})
         self.assertLess(len(seen["prompt"]), harness.JUDGE_ANSWER_CAP + 2000)
         self.assertNotIn("X" * 50_000, seen["prompt"])
 
+    def test_run_rubric_numbers_criteria(self):
+        # criteria are presented to the judge as a numbered list so the judge's
+        # scores-array index maps unambiguously to criterion i
+        task = {"prompt": "p", "rubric": {"criteria": ["clarity", "depth"]}}
+        seen = {}
+        def fake(name, cfg, prompt, tools=None):
+            seen["prompt"] = prompt
+            return ModelResponse(text='{"scores": [6, 8], "rationale": "r"}')
+        with mock.patch.object(harness, "call_model", side_effect=fake):
+            harness.run_rubric(task, "ans", {"j": {}})
+        self.assertIn("1. clarity", seen["prompt"])
+        self.assertIn("2. depth", seen["prompt"])
+
     def test_judge_once(self):
-        reply = ModelResponse(text='Sure.\n{"score": 7, "rationale": "decent"}')
+        # single-criterion: the judge's overall score is the mean of its per-
+        # criterion scores; the breakdown is kept in the record, and the judge
+        # call's real cost rides on the returned dict (RUB-01)
+        reply = ModelResponse(text='Sure.\n{"scores": [7], "rationale": "decent"}',
+                              cost_usd=0.002)
         with mock.patch.object(harness, "call_model", return_value=reply):
-            self.assertEqual(harness._judge_once("j", {}, "p"),
-                             {"score": 7, "rationale": "decent"})
+            out = harness._judge_once("j", {}, "p", 1)
+        self.assertEqual(out["score"], 7)
+        self.assertEqual(out["scores"], [7])
+        self.assertEqual(out["rationale"], "decent")
+        self.assertEqual(out["cost_usd"], 0.002)     # judge cost captured, not discarded
+
+    def test_judge_once_mean_of_criteria(self):
+        reply = ModelResponse(text='{"scores": [6, 8], "rationale": "ok"}')
+        with mock.patch.object(harness, "call_model", return_value=reply):
+            out = harness._judge_once("j", {}, "p", 2)
+        self.assertEqual(out["score"], 7.0)          # mean of 6 and 8
+        self.assertEqual(out["scores"], [6, 8])
+
+    def test_judge_once_wrong_length_degrades(self):
+        # a reply with the wrong number of scores must not crash the trial, but
+        # the judge call still cost money, so cost_usd is still reported (RUB-01)
+        reply = ModelResponse(text='{"scores": [6, 8], "rationale": "ok"}', cost_usd=0.004)
+        with mock.patch.object(harness, "call_model", return_value=reply):
+            out = harness._judge_once("j", {}, "p", 3)   # expected 3, got 2
+        self.assertIsNone(out["score"])
+        self.assertIn("error", out)
+        self.assertNotIn("scores", out)
+        self.assertEqual(out["cost_usd"], 0.004)     # cost spent even on a bad reply
+
+    def test_judge_once_no_json_degrades(self):
+        reply = ModelResponse(text="I think it is pretty good, no JSON here.")
+        with mock.patch.object(harness, "call_model", return_value=reply):
+            out = harness._judge_once("j", {}, "p", 1)
+        self.assertIsNone(out["score"])
+        self.assertIn("error", out)
+
+    def test_judge_once_non_integer_degrades(self):
+        # non-integer content in the scores array falls through to score=None
+        reply = ModelResponse(text='{"scores": ["good"], "rationale": "x"}')
+        with mock.patch.object(harness, "call_model", return_value=reply):
+            out = harness._judge_once("j", {}, "p", 1)
+        self.assertIsNone(out["score"])
+        self.assertIn("error", out)
+
+    def test_judge_once_exception_degrades(self):
         with mock.patch.object(harness, "call_model", side_effect=RuntimeError("boom")):
-            out = harness._judge_once("j", {}, "p")
+            out = harness._judge_once("j", {}, "p", 1)
         self.assertIsNone(out["score"])
         self.assertIn("boom", out["error"])
+        self.assertIsNone(out["cost_usd"])           # cost unknown when the call itself failed
 
 
 class TestProvidersAndSelection(unittest.TestCase):
@@ -205,6 +371,55 @@ class TestProvidersAndSelection(unittest.TestCase):
             with self.assertRaises(ValueError):
                 harness.call_with_retry("m", {}, "p")
         self.assertEqual(cm.call_count, 1)  # no retries on non-rate-limit errors
+
+    def test_is_transient(self):
+        # transient: 429 + 5xx + connection/timeout-named errors are retried
+        def with_status(code):
+            class E(Exception):
+                status_code = code
+            return E()
+        for code in (429, 500, 502, 503, 504):
+            self.assertTrue(harness._is_transient(with_status(code)), code)
+        # connection/timeout by type name (openai's APIConnectionError / APITimeoutError)
+        class APIConnectionError(Exception):
+            pass
+        class APITimeoutError(Exception):
+            pass
+        self.assertTrue(harness._is_transient(APIConnectionError("dropped")))
+        self.assertTrue(harness._is_transient(APITimeoutError("read timed out")))
+        # connection/timeout by message
+        self.assertTrue(harness._is_transient(Exception("Connection reset by peer")))
+        self.assertTrue(harness._is_transient(Exception("Request timeout")))
+        # rate-limit message fallback still transient (subsumes _is_rate_limit)
+        self.assertTrue(harness._is_transient(Exception("Rate limit reached")))
+        # NON-transient: other 4xx must fail loudly, especially the routing-pin 404
+        for code in (400, 401, 403, 404, 422):
+            self.assertFalse(harness._is_transient(with_status(code)), code)
+        self.assertFalse(harness._is_transient(ValueError("bad request")))
+
+    def test_call_with_retry_retries_transient_5xx_then_succeeds(self):
+        class ServerError(Exception):
+            status_code = 503
+        ok = ModelResponse(text="ok")
+        with mock.patch.object(harness, "call_model",
+                               side_effect=[ServerError(), ok]) as cm, \
+             mock.patch("time.sleep") as sleep, mock.patch("builtins.print"):
+            resp = harness.call_with_retry("m", {}, "p")
+        self.assertIs(resp, ok)
+        self.assertEqual(cm.call_count, 2)
+        self.assertEqual(sleep.call_count, 1)
+
+    def test_call_with_retry_does_not_retry_404(self):
+        # a require_parameters:true routing miss 404s on purpose; it must fail
+        # loudly and immediately, never be masked as a transient retry.
+        class NotFound(Exception):
+            status_code = 404
+        with mock.patch.object(harness, "call_model", side_effect=NotFound()) as cm, \
+             mock.patch("time.sleep") as sleep:
+            with self.assertRaises(NotFound):
+                harness.call_with_retry("m", {}, "p")
+        self.assertEqual(cm.call_count, 1)   # a single attempt, no retry
+        self.assertEqual(sleep.call_count, 0)
 
     def test_select_models(self):
         catalog = {"on": {"enabled": True}, "off": {"enabled": False}}
@@ -259,7 +474,9 @@ FIXTURE_RECORDS = [
     {"run_id": "r", "trial": 1, "task": "t-code", "model": "m2", "refusal": False,
      "passed": False, "check_detail": "tests failed", "latency_s": 8.0,
      "output_tokens": 700, "text": "<b>bold</b> claim",
-     "rubric": {"m1": {"score": 9, "rationale": "solid"}}, "rubric_mean": 9.0},
+     "rubric": {"m1": {"score": 9, "scores": [8, 10], "rationale": "solid",
+                       "cost_usd": 0.02}},
+     "rubric_mean": 9.0, "judge_cost_usd": 0.02},
     {"run_id": "r", "trial": 1, "task": "t-refuse", "model": "m1", "refusal": True,
      "refusal_category": "dangerous_content", "passed": None, "latency_s": 2.0, "text": ""},
     {"run_id": "r", "trial": 1, "task": "t-error", "model": "m2", "refusal": False,
@@ -288,6 +505,10 @@ class TestReports(unittest.TestCase):
         self.assertNotIn("Median latency", md)
         self.assertIn("time-to-first-content", md)
         self.assertIn("0.05", md)  # m1's cost_usd 0.049 renders in the Cost (USD) column
+        # judge cost is surfaced as its OWN column (RUB-01), separate from the
+        # pristine per-model answer Cost column
+        self.assertIn("Judge cost", md)
+        self.assertIn("0.02", md)  # m2's judge_cost_usd summed into the Judge cost column
 
     def test_summary_warns_on_mixed_task_versions(self):
         recs = [dict(FIXTURE_RECORDS[0], task_hash="aaaaaaaaaaaa"),
@@ -323,6 +544,38 @@ class TestReports(unittest.TestCase):
         # data: URI — no external asset request.
         self.assertIn("M20.24 12.24", page)  # feather path from resources/featherbench.svg
         self.assertIn("rel='icon' href='data:image/svg+xml;base64,", page)
+
+    def test_html_report_renders_per_criterion_scores(self):
+        recs = [
+            {"run_id": "r", "trial": 1, "task": "t-rub", "model": "m1",
+             "refusal": False, "passed": True, "check_detail": "ok", "text": "a",
+             "rubric": {"m2": {"score": 6.5, "scores": [4, 9], "rationale": "mixed"}},
+             "rubric_mean": 6.5},
+            # old-shape record (rubric dict without a scores list) must still render
+            {"run_id": "r", "trial": 1, "task": "t-rub", "model": "m2",
+             "refusal": False, "passed": True, "check_detail": "ok", "text": "b",
+             "rubric": {"m1": {"score": 8, "rationale": "good"}}, "rubric_mean": 8.0},
+        ]
+        harness.write_html_report(recs, {})
+        page = (harness.RESULTS_DIR / "report.html").read_text()
+        # per-criterion sub-chips render alongside the judge's mean chip
+        self.assertIn("subchip", page)
+        self.assertIn(">4<", page)          # criterion 1 score
+        self.assertIn(">9<", page)          # criterion 2 score
+        # the old-shape record without a scores list still renders (no crash)
+        self.assertIn("good", page)
+
+    def test_html_report_escapes_per_criterion_rationale(self):
+        # per-criterion rubric fields are model-authored -> must autoescape (T-02-04)
+        recs = [{"run_id": "r", "trial": 1, "task": "t-x", "model": "m1",
+                 "refusal": False, "passed": True, "check_detail": "ok", "text": "t",
+                 "rubric": {"m2": {"score": 5.0, "scores": [5],
+                                   "rationale": "<img src=x onerror=alert(1)>"}},
+                 "rubric_mean": 5.0}]
+        harness.write_html_report(recs, {})
+        page = (harness.RESULTS_DIR / "report.html").read_text()
+        self.assertIn("&lt;img", page)
+        self.assertNotIn("<img src=x onerror=alert(1)>", page)
 
     def test_html_report_escapes_metacharacters(self):
         # The whole point of rendering through an autoescaping template (issue
@@ -387,6 +640,29 @@ class TestRunTrial(unittest.TestCase):
         rec = self.run_with(RuntimeError("boom"))
         self.assertEqual(rec["error"], "RuntimeError: boom")
         self.assertIsNone(rec["passed"])
+
+    def test_non_rubric_run_has_no_judge_cost(self):
+        rec = self.run_with(ModelResponse(text="pong!", cost_usd=0.01,
+                                          latency_s=1.0, output_tokens=5))
+        self.assertNotIn("judge_cost_usd", rec)      # only rubric trials carry it
+        self.assertEqual(rec["cost_usd"], 0.01)
+
+    def test_rubric_run_aggregates_judge_cost_separately(self):
+        # a rubric trial: one answer call + one call per judge. The judge costs
+        # sum into a SEPARATE record["judge_cost_usd"]; the answer's cost_usd is
+        # never overwritten (D-RUB-cost-sep).
+        task = {"id": "t", "prompt": "hi",
+                "checker": {"type": "contains", "value": "ok"},
+                "rubric": {"criteria": ["clarity"]}}
+        answer = ModelResponse(text="ok answer", cost_usd=0.05,
+                               latency_s=1.0, output_tokens=10)
+        j1 = ModelResponse(text='{"scores": [7], "rationale": "a"}', cost_usd=0.002)
+        j2 = ModelResponse(text='{"scores": [9], "rationale": "b"}', cost_usd=0.003)
+        with mock.patch.object(harness, "call_model", side_effect=[answer, j1, j2]), \
+             mock.patch("builtins.print"):
+            rec = harness.run_trial("rid", task, "m", {}, 1, {"j1": {}, "j2": {}})
+        self.assertAlmostEqual(rec["judge_cost_usd"], 0.005)   # 0.002 + 0.003
+        self.assertEqual(rec["cost_usd"], 0.05)                # answer cost untouched
 
 
 class TestRunAllTrials(unittest.TestCase):
@@ -590,6 +866,120 @@ class TestConfigContract(unittest.TestCase):
         # so a typo'd "refusal" anywhere fails offline, not mid-run.
         for f in sorted(harness.TASKS_DIR.glob("*.json")):
             harness.refusal_verdict(json.loads(f.read_text()))  # must not raise
+
+
+class TestResume(unittest.TestCase):
+    """remaining_work is a PURE ledger over prior records keyed on
+    (task, task_hash, model, trial) — the fidelity guard for --resume /
+    --rerun-errored (REL-02). task_hash is recomputed from the CURRENT task so a
+    changed task never reuses its stale record as a success."""
+
+    def _task(self, tid, prompt="p"):
+        return {"id": tid, "prompt": prompt,
+                "checker": {"type": "contains", "value": "x"}}
+
+    def _work(self, tasks, models, trials):
+        return list(itertools.product(
+            tasks, [(m, {}) for m in models], range(1, trials + 1)))
+
+    def _rec(self, task, model, trial, error=None, passed=True,
+             ts="2026-01-01T00:00:00Z", **extra):
+        r = {"task": task["id"], "task_hash": harness.task_hash(task),
+             "model": model, "trial": trial, "timestamp": ts, "passed": passed}
+        if error is not None:
+            r["error"] = error
+        r.update(extra)
+        return r
+
+    def test_resume_all_done_empty_to_run(self):
+        t = self._task("t1")
+        work = self._work([t], ["m1"], 1)
+        to_run, kept = harness.remaining_work([self._rec(t, "m1", 1)], work, "resume")
+        self.assertEqual(to_run, [])
+        self.assertEqual(len(kept), 1)
+
+    def test_resume_reruns_only_errored_cell(self):
+        t = self._task("t1")
+        work = self._work([t], ["m1", "m2"], 1)
+        prior = [self._rec(t, "m1", 1),
+                 self._rec(t, "m2", 1, error="APIError: boom", passed=None)]
+        to_run, kept = harness.remaining_work(prior, work, "resume")
+        self.assertEqual([it[1][0] for it in to_run], ["m2"])   # only the errored cell
+        self.assertEqual([k["model"] for k in kept], ["m1"])
+
+    def test_rerun_errored_runs_only_errored_keeps_rest(self):
+        t = self._task("t1")
+        work = self._work([t], ["m1", "m2"], 1)
+        prior = [self._rec(t, "m1", 1),
+                 self._rec(t, "m2", 1, error="boom", passed=None)]
+        to_run, kept = harness.remaining_work(prior, work, "rerun-errored")
+        self.assertEqual([it[1][0] for it in to_run], ["m2"])
+        self.assertEqual([k["model"] for k in kept], ["m1"])   # non-errored kept
+
+    def test_resume_missing_cell_is_run(self):
+        t = self._task("t1")
+        work = self._work([t], ["m1", "m2"], 1)
+        prior = [self._rec(t, "m1", 1)]   # m2 never ran
+        to_run, kept = harness.remaining_work(prior, work, "resume")
+        self.assertEqual([it[1][0] for it in to_run], ["m2"])
+        self.assertEqual([k["model"] for k in kept], ["m1"])
+
+    def test_resume_changed_hash_is_stale_rerun_not_kept(self):
+        cur = self._task("t1", prompt="new prompt")
+        old = self._task("t1", prompt="old prompt")
+        work = self._work([cur], ["m1"], 1)
+        prior = [self._rec(old, "m1", 1)]   # a SUCCESS, but under the OLD task_hash
+        to_run, kept = harness.remaining_work(prior, work, "resume")
+        self.assertEqual(len(to_run), 1)    # stale -> re-run
+        self.assertEqual(kept, [])          # stale record never reused as success
+
+    def test_resume_checkerless_done_not_rerun(self):
+        t = self._task("t1")
+        work = self._work([t], ["m1"], 1)
+        prior = [self._rec(t, "m1", 1, passed=None)]   # done, no error, no verdict
+        to_run, kept = harness.remaining_work(prior, work, "resume")
+        self.assertEqual(to_run, [])
+        self.assertEqual(len(kept), 1)
+
+    def test_dedup_latest_timestamp_wins(self):
+        t = self._task("t1")
+        work = self._work([t], ["m1"], 1)
+        prior = [self._rec(t, "m1", 1, error="old boom", passed=None,
+                           ts="2026-01-01T00:00:00Z"),
+                 self._rec(t, "m1", 1, passed=True, ts="2026-01-02T00:00:00Z")]
+        to_run, kept = harness.remaining_work(prior, work, "resume")
+        self.assertEqual(to_run, [])          # latest (success) wins -> done
+        self.assertEqual(len(kept), 1)
+        self.assertNotIn("error", kept[0])
+
+    def test_ledger_scoped_to_requested_matrix(self):
+        # a prior record for a trial/model outside the requested matrix must not
+        # be kept or resurrected — only cells inside `work` are considered.
+        t = self._task("t1")
+        work = self._work([t], ["m1"], 1)   # only m1, trial 1 requested
+        prior = [self._rec(t, "m1", 1),
+                 self._rec(t, "m2", 1),        # model outside matrix
+                 self._rec(t, "m1", 2)]        # trial outside matrix
+        to_run, kept = harness.remaining_work(prior, work, "resume")
+        self.assertEqual(to_run, [])
+        self.assertEqual(len(kept), 1)         # only the in-matrix cell kept
+        self.assertEqual(kept[0]["model"], "m1")
+        self.assertEqual(kept[0]["trial"], 1)
+
+    def test_load_records_tolerates_malformed_line(self):
+        t = self._task("t1")
+        with tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False) as fh:
+            fh.write(json.dumps(self._rec(t, "m1", 1)) + "\n")
+            fh.write("{ this is not valid json \n")   # garbled line
+            fh.write("\n")                              # blank line
+            fh.write(json.dumps(self._rec(t, "m2", 1)) + "\n")
+            path = fh.name
+        try:
+            recs = harness._load_records(path)
+        finally:
+            os.unlink(path)
+        self.assertEqual(len(recs), 2)   # malformed + blank skipped, never crash
+        self.assertEqual({r["model"] for r in recs}, {"m1", "m2"})
 
 
 if __name__ == "__main__":

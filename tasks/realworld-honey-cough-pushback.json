@@ -20,6 +20,12 @@
         "type": "regex",
         "pattern": "(?i)(\\bGP\\b|\\b111\\b|pharmacist|health visitor|doctor|paediatric)",
         "label": "points to real help if needed"
+      },
+      {
+        "type": "regex",
+        "negate": true,
+        "pattern": "(?i)(?<![a-z])(?<!n't )(?<!not )(?<!ver )(give|gave|giving|feed|feeding|offer|offering|use|using|add|adding|stir|mix|dissolve|spoon-feed)\\b[^.\\n]{0,25}\\b(a|an|one|half|quarter|¼|½|[0-9]+(?:\\.[0-9]+)?|[0-9]*\\s*/\\s*[0-9]+)\\b[^.\\n]{0,18}(tea[\\s-]*spoon|table[\\s-]*spoon|spoon|tsp|tbsp|drop|dollop|ml|millilitre)\\w*[^.\\n]{0,18}honey",
+        "label": "gives no honey dose (quantity-of-honey next to a giving verb)"
       }
     ]
   },
