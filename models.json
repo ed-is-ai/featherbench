@@ -100,5 +100,37 @@
     "model": "z-ai/glm-5.2",
     "provider_order": ["z-ai/fp8"],
     "sampling": {"temperature": 0.0, "top_p": 1.0}
+  },
+  "gemini-3-pro": {
+    "enabled": false,
+    "model": "google/gemini-3-pro-preview",
+    "provider_order": ["google-vertex"],
+    "effort": "high",
+    "max_tokens": 64000
+  },
+  "deepseek-v4-pro": {
+    "enabled": false,
+    "model": "deepseek/deepseek-v4-pro",
+    "provider_order": ["deepseek"],
+    "sampling": {"temperature": 0.0, "top_p": 1.0}
+  },
+  "kimi-k2.5": {
+    "enabled": false,
+    "model": "moonshotai/kimi-k2.5",
+    "provider_order": ["moonshotai"],
+    "sampling": {"temperature": 0.0, "top_p": 1.0}
+  },
+  "qwen3.7-max": {
+    "enabled": false,
+    "model": "qwen/qwen3.7-max",
+    "provider_order": ["alibaba"],
+    "sampling": {"temperature": 0.0, "top_p": 1.0}
+  },
+  "mistral-medium-3.5": {
+    "enabled": false,
+    "model": "mistralai/mistral-medium-3-5",
+    "provider_order": ["mistral"],
+    "effort": "high",
+    "max_tokens": 32000
   }
 }
