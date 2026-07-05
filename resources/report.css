@@ -1,0 +1,54 @@
+
+:root { --bg:#fff; --fg:#1a1a1a; --muted:#666; --card:#f6f6f7; --border:#e2e2e5;
+        --pass:#137333; --passbg:#e6f4ea; --fail:#c5221f; --failbg:#fce8e6;
+        --refuse:#b06000; --refusebg:#fef3e0; --err:#7c3aed; --errbg:#f0e9fc;
+        --accent:#1a73e8; --code:#f0f0f2; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#16171a; --fg:#e6e6e8; --muted:#9a9aa2; --card:#1e2024; --border:#31333a;
+          --pass:#81c995; --passbg:#1e3226; --fail:#f28b82; --failbg:#3a2221;
+          --refuse:#fcc46b; --refusebg:#3a2e18; --err:#c5a3ff; --errbg:#2b2440;
+          --accent:#8ab4f8; --code:#101114; } }
+* { box-sizing:border-box; }
+body { margin:0; font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+       background:var(--bg); color:var(--fg); }
+header { padding:20px 24px; border-bottom:1px solid var(--border); position:sticky; top:0;
+         background:var(--bg); z-index:5; }
+.brand { display:flex; align-items:center; gap:10px; margin:0 0 4px; }
+.brand svg { width:28px; height:28px; flex:none; }
+h1 { margin:0; font-size:18px; }
+.sub { color:var(--muted); font-size:13px; }
+.controls { margin-top:12px; display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+.controls button { font:inherit; padding:5px 12px; border:1px solid var(--border); border-radius:999px;
+        background:var(--card); color:var(--fg); cursor:pointer; }
+.controls button.on { background:var(--accent); color:#fff; border-color:var(--accent); }
+.controls input { font:inherit; padding:5px 10px; border:1px solid var(--border); border-radius:6px;
+        background:var(--card); color:var(--fg); flex:1; min-width:160px; }
+main { padding:16px 24px 60px; max-width:1100px; }
+.task { margin:22px 0; }
+.task > h2 { font-size:16px; margin:0 0 2px; }
+.cat { font-size:11px; font-weight:500; padding:1px 8px; border-radius:999px; background:var(--card);
+       border:1px solid var(--border); color:var(--muted); margin-left:8px; vertical-align:middle; }
+.task-desc { color:var(--muted); font-size:12.5px; margin:0 0 6px; }
+details.prompt { margin:6px 0 12px; }
+details.prompt summary { cursor:pointer; color:var(--accent); font-size:12.5px; }
+pre { background:var(--code); border:1px solid var(--border); border-radius:8px; padding:12px;
+      overflow-x:auto; white-space:pre-wrap; word-wrap:break-word; font:12.5px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; margin:6px 0; }
+.trial { border:1px solid var(--border); border-radius:10px; padding:12px 14px; margin:10px 0; background:var(--card); }
+.trial.hidden { display:none; }
+.row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+.badge { font-weight:600; font-size:11px; padding:2px 9px; border-radius:999px; letter-spacing:.02em; }
+.b-pass { color:var(--pass); background:var(--passbg); }
+.b-fail { color:var(--fail); background:var(--failbg); }
+.b-refuse { color:var(--refuse); background:var(--refusebg); }
+.b-err { color:var(--err); background:var(--errbg); }
+.model { font-weight:600; }
+.meta { color:var(--muted); font-size:12px; }
+.detail { font-size:12.5px; margin-top:6px; }
+.detail .k { color:var(--muted); }
+.rubric { margin-top:6px; font-size:12.5px; }
+.rubric .chip { display:inline-block; margin:2px 6px 2px 0; padding:1px 8px; border-radius:6px;
+        background:var(--bg); border:1px solid var(--border); }
+.rubric .subchip { display:inline-block; margin:0 0 0 4px; padding:0 6px; border-radius:5px;
+        font-size:11px; color:var(--muted); background:var(--card); border:1px solid var(--border); }
+.rubric .rat { color:var(--muted); font-size:12px; margin:2px 0 0 2px; }
+details.resp summary { cursor:pointer; color:var(--accent); font-size:12.5px; margin-top:6px; }
