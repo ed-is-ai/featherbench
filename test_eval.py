@@ -322,13 +322,6 @@ class TestRubric(unittest.TestCase):
 
 
 class TestProvidersAndSelection(unittest.TestCase):
-    def test_is_rate_limit(self):
-        class RateLimitError(Exception):
-            status_code = 429
-        self.assertTrue(harness._is_rate_limit(RateLimitError()))            # status_code 429
-        self.assertTrue(harness._is_rate_limit(Exception("Rate limit reached")))  # message fallback
-        self.assertFalse(harness._is_rate_limit(ValueError("bad request")))
-
     def test_call_with_retry_backs_off_then_succeeds(self):
         class RateLimitError(Exception):
             status_code = 429
@@ -373,7 +366,7 @@ class TestProvidersAndSelection(unittest.TestCase):
         # connection/timeout by message
         self.assertTrue(harness._is_transient(Exception("Connection reset by peer")))
         self.assertTrue(harness._is_transient(Exception("Request timeout")))
-        # rate-limit message fallback still transient (subsumes _is_rate_limit)
+        # rate-limit message fallback still classed transient
         self.assertTrue(harness._is_transient(Exception("Rate limit reached")))
         # NON-transient: other 4xx must fail loudly, especially the routing-pin 404
         for code in (400, 401, 403, 404, 422):

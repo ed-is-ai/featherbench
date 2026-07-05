@@ -197,16 +197,6 @@ def call_openrouter(cfg, prompt, tools=None):
         sampling_sent=sampling_sent)
 
 
-def _is_rate_limit(exc):
-    """True for rate-limit / 429 errors, without importing any provider SDK:
-    match status_code 429, or the exception's type name / message."""
-    status = getattr(exc, "status_code", None) or getattr(
-        getattr(exc, "response", None), "status_code", None)
-    if status == 429:
-        return True
-    return "ratelimit" in type(exc).__name__.lower() or "rate limit" in str(exc).lower()
-
-
 _TRANSIENT_STATUS = {429, 500, 502, 503, 504}
 
 
@@ -215,10 +205,9 @@ def _is_transient(exc):
 
     A flaky provider blip — a 429 rate limit, a 5xx (500/502/503/504), a dropped
     connection or a read timeout — is worth retrying: it is not the model being
-    wrong, just the pipe. Read the status the same SDK-free way as _is_rate_limit
-    (off the exc or its .response) and match the connection/timeout families by
-    type name / message so openai's APIConnectionError / APITimeoutError retry
-    without an import.
+    wrong, just the pipe. Read the status SDK-free directly off the exc or its
+    .response and match the connection/timeout families by type name / message
+    so openai's APIConnectionError / APITimeoutError retry without an import.
 
     Deliberately EXCLUDES every other 4xx — 400/401/403/404/422. In particular a
     404 is the require_parameters:true routing-pin miss (a mislabeled-model
@@ -234,7 +223,10 @@ def _is_transient(exc):
     blob = (type(exc).__name__ + " " + str(exc)).lower()
     if "connection" in blob or "timeout" in blob:
         return True
-    return _is_rate_limit(exc)  # message-only rate limits (no status) stay transient
+    # message-only rate limits (no status) stay transient; probe type name and
+    # message on their own sources, not the joined blob, so a no-space token in
+    # the message (or a spaced phrase in the type name) cannot cross-match.
+    return "ratelimit" in type(exc).__name__.lower() or "rate limit" in str(exc).lower()
 
 
 def call_with_retry(cfg, prompt, tools=None, retries=4, base_delay=2.0):
