@@ -1,4 +1,4 @@
-# <img src="resources/featherbench.svg" alt="Featherbench logo" width="38" align="top"> Featherbench
+# ![Featherbench logo](https://raw.githubusercontent.com/ed-is-ai/featherbench/main/resources/featherbench.svg) Featherbench
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue.svg)](pyproject.toml)
