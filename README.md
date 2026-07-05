@@ -9,16 +9,18 @@ domain-specific tasks you actually care about, not just the public leaderboards.
 You write tasks as small JSON files. Every task runs through the same scaffold
 against every model you select, with the same prompt and the same pass/fail
 checker, so the numbers are **directly comparable** across models — unlike
-vendor-reported benchmark scores produced on different harnesses. Three
-provider families work out of the box (Anthropic, OpenAI, and any
-OpenAI-compatible endpoint such as GLM), and results land as JSONL, a Markdown
-summary, and a self-contained HTML review page.
+vendor-reported benchmark scores produced on different harnesses. Every model
+is reached through a single, routing-pinned [OpenRouter](https://openrouter.ai)
+integration — one API, one key, comparable cost and latency for every model —
+and results land as JSONL, a Markdown summary, and a self-contained HTML review
+page.
 
 **Design goals — why "featherweight":**
 
-- **One file, no framework lock-in.** [`eval.py`](eval.py) is ~1,050 lines of
-  plain Python with two dependencies (`openai`, `jinja2`) — everything else
-  is the standard library. Read it in one sitting; fork it without ceremony.
+- **One file, no framework lock-in.** [`eval.py`](eval.py) is ~1,150 lines of
+  plain Python with two dependencies (`openai` — used as the OpenRouter client —
+  and `jinja2` for the HTML report); everything else is the standard library.
+  Read it in one sitting; fork it without ceremony.
 - **Tasks are data, not code.** A task is a JSON file. Non-engineers can author
   them; they diff cleanly in review.
 - **Deterministic floor + optional judged quality.** Most real-world answers
@@ -37,44 +39,65 @@ this is that.
 
 ## Setup
 
-```sh
-pip3 install openai jinja2
+Requires Python 3.9+ (matching `requires-python` in `pyproject.toml`).
 
-export ANTHROPIC_API_KEY=sk-ant-...   # or `ant auth login` — the SDK picks up the profile
-export OPENAI_API_KEY=sk-...
-export GLM_API_KEY=...
-# GLM endpoint defaults to https://api.z.ai/api/paas/v4/ (Z.ai international).
-# For mainland bigmodel.cn: export GLM_BASE_URL=https://open.bigmodel.cn/api/paas/v4/
+```sh
+pip install .                 # installs the pinned deps from pyproject.toml (openai, jinja2)
+# no-clone alternative:
+# pip3 install openai jinja2
+
+export OPENROUTER_API_KEY=sk-or-...   # one key for every model — get it at openrouter.ai/keys
+# Optional: override the endpoint (defaults to https://openrouter.ai/api/v1)
+# export OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
 ```
 
-You only need keys for the providers you actually run. A run that selects only
-Anthropic models needs only `ANTHROPIC_API_KEY`.
+Every model — Anthropic, OpenAI, GLM, and anything else in the catalogue — is
+reached through OpenRouter, so a single `OPENROUTER_API_KEY` covers the whole
+run. No per-provider keys.
 
-**Where the keys live.** They are read from these environment variables and
-nowhere else — no key is stored in the repo, in `models.json`, or on disk. The
-SDK clients pick them up when a provider is called ([`call_anthropic`](eval.py),
-[`call_openai_*`](eval.py); the GLM key is named by `api_key_env` in
-`models.json`). Two consequences worth knowing:
+**Where the key lives.** It is read from the `OPENROUTER_API_KEY` environment
+variable and nowhere else — no key is stored in the repo, in `models.json`, or
+on disk. The client picks it up when a model is called
+([`call_openrouter`](eval.py)). Two consequences worth knowing:
 
-- **The `python_tests` checker never sees your keys.** It runs model-generated
+- **The `python_tests` checker never sees your key.** It runs model-generated
   code in a subprocess with a stripped environment (`PATH` only), so a task
-  answer cannot read `ANTHROPIC_API_KEY` and exfiltrate it. This is enforced in
+  answer cannot read `OPENROUTER_API_KEY` and exfiltrate it. This is enforced in
   code, independent of any sandbox.
-- **Keep them out of your interactive shell if you can.** `export` leaves a key
-  visible to other processes running as you (`env`, `ps e`). To scope a key to a
-  single run, prefix the command instead:
-  `ANTHROPIC_API_KEY=sk-ant-... python3 eval.py`. Under nono, keys pass through
-  from the launching shell by default — see [the sandbox section](#-run-this-on-a-sandboxed-machine).
+- **Keep it out of your interactive shell if you can.** `export` leaves a key
+  visible to other processes running as you (`env`, `ps e`). To scope the key to
+  a single run, prefix the command instead:
+  `OPENROUTER_API_KEY=sk-or-... python3 eval.py`. Under nono, the key passes
+  through from the launching shell by default — see [the sandbox section](#-run-this-on-a-sandboxed-machine).
 
 ### Models
 
-[`models.json`](models.json) is a catalog of selectable models across three
-providers — Anthropic (`fable-5`, `opus-4-8`/`4-7`/`4-6`/`4-5`, `sonnet-5`,
-`sonnet-4-6`, `haiku-4-5`), OpenAI (`gpt-5.5`, `gpt-5`, `gpt-5-mini`, `o3`,
-`o4-mini` via the Responses API; `gpt-4.1`, `gpt-4o` via chat completions), and
-an OpenAI-compatible endpoint (`glm-5.2`). Each entry carries its provider
-config, optional `effort` / `reasoning_effort` (omit it for tiers that don't
-support it, e.g. `haiku-4-5` and the non-reasoning GPTs), and `pricing_per_mtok`.
+[`models.json`](models.json) is a catalog of selectable models, each keyed by a
+short handle (`fable-5`, `gpt-5.5`, `glm-5.2`, …) and carrying a flat
+**OpenRouter slug** plus its per-request routing and sampling config. A typical
+entry:
+
+```json
+"fable-5": {
+  "enabled": true,
+  "model": "anthropic/claude-fable-5",   // the OpenRouter slug
+  "provider_order": ["anthropic"],        // routing pin: which upstream serves it
+  "effort": "high",                        // reasoning effort (omit for non-reasoning tiers)
+  "max_tokens": 64000
+}
+```
+
+- **`model`** is the OpenRouter slug (`anthropic/claude-fable-5`,
+  `openai/gpt-5.5`, `z-ai/glm-5.2`).
+- **`provider_order`** pins routing to the labelled upstream (e.g. `["z-ai/fp8"]`
+  for GLM's first-party fp8 endpoint) — combined with `allow_fallbacks:false`
+  and `require_parameters:true`, a run never scores a silent fallback or a
+  quantized variant in place of the model you named.
+- **`sampling`** (optional) declares only the params the pinned endpoint
+  supports (`temperature` / `top_p` / `seed`); anything unsupported is left off
+  so `require_parameters` doesn't reject the route.
+- **`effort`** (optional) sets reasoning effort; omit it for tiers that don't
+  support it.
 
 Selection:
 
@@ -85,11 +108,11 @@ Selection:
   errors with the list of valid ones).
 - **`--models all`** runs the whole catalog.
 
-Before a real run, check each model ID against the provider's current catalog
-and fill in `pricing_per_mtok` (Anthropic prices are pre-filled from the public
-table; OpenAI/GLM are left `null` — the cost column shows `n/a` until you set
-them). The exact OpenAI IDs (`gpt-5.5`, `o4-mini`, …) and `glm-5.2` in
-particular should be adjusted to what your accounts expose.
+Cost comes straight from OpenRouter's per-response `usage.cost`, so the Cost
+(USD) column populates for **every** model with no price table to maintain.
+Before a real run, check each slug against
+[OpenRouter's model list](https://openrouter.ai/models) and adjust the exact IDs
+(`openai/gpt-5.5`, `z-ai/glm-5.2`, …) to what your account can route to.
 
 ## ⚠️ Run this on a sandboxed machine
 
@@ -111,17 +134,15 @@ proxy mode):
 
 ```sh
 nono run --allow . \
-  --allow-domain api.anthropic.com \
-  --allow-domain api.openai.com \
-  --allow-domain api.z.ai \
+  --allow-domain openrouter.ai \
   -- python3 eval.py
 ```
 
-nono passes your `ANTHROPIC_API_KEY` etc. through from the launching shell, so
-the harness can still authenticate; the sandbox's job is to stop model-generated
-code from reaching your files or the network, not to hide the keys the harness
-itself needs. To avoid keys living in your interactive shell at all, prefix them
-on the nono command (`ANTHROPIC_API_KEY=sk-ant-... nono run ... -- python3
+nono passes your `OPENROUTER_API_KEY` through from the launching shell, so the
+harness can still authenticate; the sandbox's job is to stop model-generated
+code from reaching your files or the network, not to hide the key the harness
+itself needs. To avoid the key living in your interactive shell at all, prefix it
+on the nono command (`OPENROUTER_API_KEY=sk-or-... nono run ... -- python3
 eval.py`).
 
 If you'd rather not use a sandbox, run the harness on an isolated machine (or
@@ -306,9 +327,9 @@ any other answer.
 ### Tool use
 
 A task can offer tools by adding a provider-neutral `tools` list; the harness
-translates it to each provider's format (Anthropic `input_schema`, OpenAI
-Responses flat function tools, GLM/OpenAI-chat nested `function`) and records
-the model's calls as a normalized `tool_calls` list on each result. This is
+translates it to OpenRouter's chat-completions tool format (nested under a
+`function` key) and normalizes the model's calls back into a `tool_calls` list
+on each result, so tasks stay provider-agnostic. This is
 **single-step** (Level 1–2): the harness captures the first turn's tool calls
 and the `tool_called` / `tool_not_called` checkers inspect them — it does not
 run a mock tool and feed the result back for a second turn. Tools are declared
@@ -369,15 +390,15 @@ The harness is meant to be forked. The common extensions and where they live:
   `json_schema` (validate a JSON block), `sql_result` (run the model's SQL
   against an in-memory SQLite fixture and assert the result set), `numeric_close`
   (answer within a tolerance).
-- **A new provider or model.** For a new *model* on an existing provider, add an
-  entry to `models.json`. For a new *provider protocol*, write a
-  `(cfg, prompt, tools=None) -> ModelResponse` function and register it with
-  `@provider("<name>", api="<api>")`; `call_model` dispatches on the
-  `(provider, api)` pair from `models.json` and stamps `latency_s` for you. Fill
-  in the `ModelResponse` (`text`, `tool_calls`, `stop_reason`, `input_tokens`,
-  `output_tokens`, and `refusal`/`refusal_category` if applicable). Everything
-  downstream — checkers, cost, the report, rubric judging — works unchanged
-  because it only sees that object.
+- **A new model.** Add an entry to `models.json` with its OpenRouter slug and a
+  `provider_order` routing pin — no code change, since every model goes through
+  the one `call_openrouter` path. All models OpenRouter can reach are available
+  this way. If you need to talk to something OpenRouter doesn't serve, replace
+  the single `call_openrouter` function (it returns a `ModelResponse` with
+  `text`, `tool_calls`, `stop_reason`, `input_tokens`, `output_tokens`,
+  `cost_usd`, and `refusal`/`refusal_category` if applicable) — everything
+  downstream (checkers, cost, the report, rubric judging) works unchanged because
+  it only sees that object.
 - **A new task field.** Fields you add to a task JSON are available on the
   `task` dict in `main()`; thread them where you need them (e.g. a per-task
   `system` prompt, a per-task `max_tokens`, a `tags` list for grouping).
@@ -399,8 +420,10 @@ The harness is meant to be forked. The common extensions and where they live:
 The per-trial record schema (keys in each `results-<ts>.jsonl`) is the stable contract
 between the harness and your tooling: `run_id, task, task_hash, model, trial,
 timestamp, text, tool_calls, passed, check_detail, refusal, refusal_category,
-stop_reason, latency_s, input_tokens, output_tokens, cost_usd, rubric,
-rubric_mean, error`.
+stop_reason, latency_s, wall_clock_s, input_tokens, output_tokens, cost_usd,
+sampling_sent, rubric, rubric_mean, error`. `latency_s` is time-to-first-token
+and `wall_clock_s` is the full-response wall time; `sampling_sent` records the
+exact sampling params that reached the pinned endpoint.
 
 ## What ships — the sample task library
 
@@ -440,16 +463,18 @@ single-shot luck.
 - **Refusals are recorded, not hidden.** If a safety classifier declines a
   request the trial is logged as a refusal with its category — not silently
   retried on another model, which would attribute one model's output to another.
-  (Production Anthropic code should opt into server-side fallbacks; the harness
-  deliberately doesn't, so the measurement stays clean.)
+  Routing is pinned with `allow_fallbacks:false`, so OpenRouter never quietly
+  re-serves the request on a different upstream or a quantized variant — the
+  measurement stays clean.)
 - **Effort / reasoning settings are pinned in `models.json`** and materially
   affect quality and cost — state them alongside any published numbers.
-- **Latency** is wall-clock for the full response; all models are called
-  identically (Anthropic via streaming to avoid HTTP timeouts on long turns).
-  Runs are **serial by default** so the latency clock is uncontaminated;
-  `--concurrency N` parallelises trials for speed but concurrent requests can
-  inflate each other's measured latency, so leave it at 1 when latency is a
-  reported number.
+- **Latency** is reported as **time-to-first-token** (`latency_s`), with
+  full-response **wall-clock** (`wall_clock_s`) recorded alongside it. Every
+  model is called identically through one OpenRouter streaming path, so the clock
+  is the same for all of them. Runs are **serial by default** so the latency
+  clock is uncontaminated; `--concurrency N` parallelises trials for speed but
+  concurrent requests can inflate each other's measured latency, so leave it at 1
+  when latency is a reported number.
 - **Rate-limit errors are retried** with exponential backoff (429s only; other
   errors surface immediately), so a large run isn't thinned by transient 429s.
   The recorded latency is that of the successful attempt, not the backoff waits.

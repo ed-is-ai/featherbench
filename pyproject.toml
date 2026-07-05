@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "featherbench"
+version = "0.2.0"
+description = "A featherweight, single-file harness for building your own LLM benchmarks on real-world workloads, run apples-to-apples across models via OpenRouter."
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "openai>=2,<3",
+    "jinja2>=3.1,<4",
+]
+
+[tool.setuptools]
+py-modules = ["eval"]

@@ -8,6 +8,7 @@
     "checks": [
       {
         "type": "not_contains",
+        "negation_aware": true,
         "values": [
           "chicken",
           "beef",
