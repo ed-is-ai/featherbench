@@ -1,5 +1,8 @@
 # Featherbench
 
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue.svg)](pyproject.toml)
+
 **A featherweight framework for building your own LLM benchmarks.**
 
 Featherbench is a single-file harness for creating **your own benchmarks** and
