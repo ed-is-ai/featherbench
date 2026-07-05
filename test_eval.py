@@ -3,15 +3,35 @@
 
     python3 -m unittest test_eval -v
 """
+import json
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace as NS
 from unittest import mock
 
 import eval as harness
 from eval import ModelResponse
 
 PASSING_CODE = "Here you go:\n```python\ndef add(a, b):\n    return a + b\n```"
+
+
+# --- fake OpenRouter stream chunks (duck-typed; no SDK, no network) ------------
+# reduce_stream only touches .usage, .choices, choices[0].delta(.content/.reasoning/
+# .tool_calls), .finish_reason and .native_finish_reason — so SimpleNamespace is enough.
+
+def _content_chunk(content=None, reasoning=None, tool_calls=None,
+                   finish_reason=None, native_finish_reason=None):
+    delta = NS(content=content, reasoning=reasoning, tool_calls=tool_calls)
+    ch = NS(delta=delta, finish_reason=finish_reason,
+            native_finish_reason=native_finish_reason)
+    return NS(choices=[ch], usage=None)
+
+
+def _usage_chunk(cost=None, prompt_tokens=None, completion_tokens=None):
+    """The final usage-only chunk: empty .choices, a populated .usage."""
+    return NS(choices=[], usage=NS(cost=cost, prompt_tokens=prompt_tokens,
+                                   completion_tokens=completion_tokens))
 
 
 class TestCheckers(unittest.TestCase):
@@ -136,18 +156,22 @@ class TestRubric(unittest.TestCase):
 
 
 class TestProvidersAndSelection(unittest.TestCase):
-    def test_dispatch(self):
-        def lookup(cfg):
-            return (harness.PROVIDERS.get((cfg["provider"], cfg.get("api")))
-                    or harness.PROVIDERS.get((cfg["provider"], None)))
-        self.assertIs(lookup({"provider": "anthropic"}), harness.call_anthropic)
-        self.assertIs(lookup({"provider": "openai", "api": "responses"}),
-                      harness.call_openai_responses)
-        self.assertIs(lookup({"provider": "openai", "api": "chat"}), harness.call_openai_chat)
-        self.assertIs(lookup({"provider": "openai_compatible", "api": "chat"}),
-                      harness.call_openai_chat)
-        with self.assertRaises(ValueError):
-            harness.call_model("m", {"provider": "mystery"}, "hi")
+    def test_single_path_routes_through_call_openrouter(self):
+        # every model now goes through the one call_openrouter path; there is no
+        # (provider, api) registry left to dispatch on.
+        sentinel = ModelResponse(text="routed")
+        cfg = {"model": "openai/gpt-5.5", "provider_order": ["openai"]}
+        with mock.patch.object(harness, "call_openrouter", return_value=sentinel) as co:
+            resp = harness.call_model("m", cfg, "hi")
+        self.assertIs(resp, sentinel)
+        co.assert_called_once_with(cfg, "hi", None)
+        for gone in ("PROVIDERS", "provider", "_client_kwargs", "cost_usd"):
+            self.assertFalse(hasattr(harness, gone), f"{gone} should be removed")
+        # the three direct-SDK provider fns are gone too (names built from parts so
+        # this file carries no literal reference to the retired symbols)
+        for suffix in ("anthropic", "openai_responses", "openai_chat"):
+            self.assertFalse(hasattr(harness, "call_" + suffix),
+                             f"call_{suffix} should be removed")
 
     def test_is_rate_limit(self):
         class RateLimitError(Exception):
@@ -196,10 +220,14 @@ class TestProvidersAndSelection(unittest.TestCase):
         with self.assertRaises(SystemExit):
             harness.select_tasks(None, "no-such-category-xyz")
 
-    def test_cost_usd(self):
-        cfg = {"pricing_per_mtok": {"input": 10.0, "output": 50.0}}
-        self.assertAlmostEqual(harness.cost_usd(cfg, 1_000_000, 100_000), 15.0)
-        self.assertIsNone(harness.cost_usd({}, 1, 1))
+    def test_cost_comes_from_the_stream_not_a_price_table(self):
+        # cost is no longer computed from a pricing table; it arrives on the
+        # response via reduce_stream reading usage.cost from the final chunk.
+        self.assertFalse(hasattr(harness, "cost_usd"))
+        r = harness.reduce_stream(
+            [_usage_chunk(cost=0.42, prompt_tokens=3, completion_tokens=4)],
+            t0=0.0, now=lambda: 1.0)
+        self.assertEqual(r["cost"], 0.42)
 
     def test_task_hash_tracks_scoring_fields_only(self):
         a = {"id": "t", "prompt": "p", "checker": {"type": "contains", "value": "x"}}
@@ -227,7 +255,7 @@ class TestProvidersAndSelection(unittest.TestCase):
 FIXTURE_RECORDS = [
     {"run_id": "r", "trial": 1, "task": "t-code", "model": "m1", "refusal": False,
      "passed": True, "check_detail": "tests passed", "latency_s": 12.3,
-     "output_tokens": 900, "cost_usd": 0.049, "text": "ok"},
+     "wall_clock_s": 45.6, "output_tokens": 900, "cost_usd": 0.049, "text": "ok"},
     {"run_id": "r", "trial": 1, "task": "t-code", "model": "m2", "refusal": False,
      "passed": False, "check_detail": "tests failed", "latency_s": 8.0,
      "output_tokens": 700, "text": "<b>bold</b> claim",
@@ -254,6 +282,12 @@ class TestReports(unittest.TestCase):
         self.assertIn("Wilson interval", md)
         self.assertIn("| t-refuse | refused | — |", md)
         self.assertIn("## Judge bias matrix", md)
+        # the latency column is relabelled to TTFT (not "latency") with a
+        # time-to-first-content caveat, and cost still populates from cost_usd (D-04/D-05).
+        self.assertIn("Median TTFT", md)
+        self.assertNotIn("Median latency", md)
+        self.assertIn("time-to-first-content", md)
+        self.assertIn("0.05", md)  # m1's cost_usd 0.049 renders in the Cost (USD) column
 
     def test_summary_warns_on_mixed_task_versions(self):
         recs = [dict(FIXTURE_RECORDS[0], task_hash="aaaaaaaaaaaa"),
@@ -276,6 +310,9 @@ class TestReports(unittest.TestCase):
             self.assertIn(badge, page)
         self.assertIn("&lt;b&gt;bold&lt;/b&gt;", page)  # model text escaped, not injected
         self.assertNotIn("<b>bold</b>", page)
+        # wall-clock surfaces alongside TTFT when the record carries wall_clock_s
+        self.assertIn("45.6s wall", page)
+        self.assertIn("12.3s TTFT", page)
 
 
 class TestRunTrial(unittest.TestCase):
@@ -344,6 +381,188 @@ class TestRunAllTrials(unittest.TestCase):
         written = self._run(concurrency=3)  # order may differ, coverage must not
         self.assertEqual({w["task"] for w in written}, {f"task{i}" for i in range(6)})
         self.assertEqual(len(written), 6)
+
+
+class TestOpenRouter(unittest.TestCase):
+    """The pure OpenRouter helpers, exercised against synthetic streams — no
+    OpenAI client, no OPENROUTER_API_KEY, no network."""
+
+    # --- build_request: routing pin + gated sampling + unified reasoning -------
+
+    def test_build_request_fable_sends_no_sampling(self):
+        cfg = {"model": "anthropic/claude-fable-5", "provider_order": ["anthropic"],
+               "effort": "high", "max_tokens": 64000}
+        kwargs, eb, sent = harness.build_request(cfg, "hi", None)
+        self.assertEqual(sent, {})  # Fable accepts no sampling params (Pitfall 6)
+        for p in ("temperature", "top_p", "seed"):
+            self.assertNotIn(p, kwargs)
+        self.assertEqual(eb["reasoning"], {"effort": "high"})
+        self.assertEqual(eb["provider"], {"order": ["anthropic"],
+                                          "allow_fallbacks": False,
+                                          "require_parameters": True})
+        self.assertEqual(eb["usage"], {"include": True})
+        self.assertTrue(kwargs["stream"])
+        self.assertEqual(kwargs["stream_options"], {"include_usage": True})
+
+    def test_build_request_gpt_sends_seed_only(self):
+        cfg = {"model": "openai/gpt-5.5", "provider_order": ["openai"],
+               "effort": "high", "sampling": {"seed": 7}}
+        kwargs, eb, sent = harness.build_request(cfg, "hi", None)
+        self.assertEqual(sent, {"seed": 7})
+        self.assertEqual(kwargs["seed"], 7)
+        self.assertNotIn("temperature", kwargs)
+        self.assertNotIn("top_p", kwargs)
+        self.assertEqual(eb["reasoning"], {"effort": "high"})
+
+    def test_build_request_glm_sends_all_sampling_and_no_reasoning(self):
+        cfg = {"model": "z-ai/glm-5.2", "provider_order": ["z-ai"],
+               "sampling": {"temperature": 0.0, "top_p": 1.0, "seed": 7}}
+        kwargs, eb, sent = harness.build_request(cfg, "hi", None)
+        self.assertEqual(sent, {"temperature": 0.0, "top_p": 1.0, "seed": 7})
+        self.assertEqual((kwargs["temperature"], kwargs["top_p"], kwargs["seed"]),
+                         (0.0, 1.0, 7))
+        self.assertNotIn("reasoning", eb)  # no effort key -> no reasoning block
+        self.assertEqual(eb["provider"]["order"], ["z-ai"])
+
+    def test_build_request_tools_use_chat_shape(self):
+        tools = [{"name": "get_weather", "description": "d", "parameters": {"type": "object"}}]
+        kwargs, _, _ = harness.build_request(
+            {"model": "z-ai/glm-5.2", "provider_order": ["z-ai"]}, "hi", tools)
+        self.assertEqual(kwargs["tools"][0]["type"], "function")
+        self.assertEqual(kwargs["tools"][0]["function"]["name"], "get_weather")
+
+    # --- reduce_stream: TTFT at first content, text, cost, tool-call folding ----
+
+    def test_reduce_stream_stamps_ttft_at_first_content(self):
+        clock = iter([0.5, 4.0])  # -> ttft, then wall
+        chunks = [
+            _content_chunk(reasoning="thinking..."),  # reasoning-only: no TTFT here
+            _content_chunk(content="Hello"),          # first content -> TTFT stamped
+            _content_chunk(content=" world", finish_reason="stop",
+                           native_finish_reason="stop"),
+            _usage_chunk(cost=0.0123, prompt_tokens=11, completion_tokens=7),
+        ]
+        r = harness.reduce_stream(chunks, t0=0.0, now=lambda: next(clock))
+        self.assertEqual(r["text"], "Hello world")
+        self.assertAlmostEqual(r["ttft"], 0.5)  # not stamped on the reasoning delta
+        self.assertAlmostEqual(r["wall"], 4.0)
+        self.assertEqual(r["cost"], 0.0123)
+        self.assertEqual((r["input_tokens"], r["output_tokens"]), (11, 7))
+        self.assertEqual(r["finish_reason"], "stop")
+
+    def test_reduce_stream_accumulates_tool_call_deltas(self):
+        first = NS(index=0, function=NS(name="get_weather", arguments='{"ci'))
+        rest = NS(index=0, function=NS(name=None, arguments='ty": "Paris"}'))
+        chunks = [
+            _content_chunk(tool_calls=[first]),
+            _content_chunk(tool_calls=[rest], finish_reason="tool_calls",
+                           native_finish_reason="tool_calls"),
+            _usage_chunk(prompt_tokens=5, completion_tokens=9),
+        ]
+        r = harness.reduce_stream(chunks, t0=0.0, now=lambda: 1.0)
+        self.assertIsNone(r["ttft"])  # no content delta -> no TTFT
+        self.assertEqual(r["tool_calls"],
+                         [{"name": "get_weather", "arguments": {"city": "Paris"}}])
+
+    # --- map_refusal: provider signal first ------------------------------------
+
+    def test_map_refusal_detects_hard_refusals(self):
+        self.assertTrue(harness.map_refusal("content_filter", None, None)[0])
+        self.assertTrue(harness.map_refusal("stop", "refusal", None)[0])
+        self.assertTrue(harness.map_refusal("stop", "SAFETY", None)[0])  # case-insensitive
+        self.assertFalse(harness.map_refusal("stop", "stop", None)[0])
+        self.assertFalse(harness.map_refusal("length", None, None)[0])
+        # a structured category surfaces from message.refusal when present
+        self.assertEqual(
+            harness.map_refusal("content_filter", None, NS(refusal="policy"))[1], "policy")
+
+
+class TestConfigContract(unittest.TestCase):
+    """Bind the *shipped* models.json and security-task JSONs to the pure request
+    builder and refusal_verdict — offline, no client, no OPENROUTER_API_KEY. These
+    catch config drift that synthetic-fixture unit tests cannot see: a real
+    models.json entry that would hand build_request an unsupported sampling param
+    (the live Pitfall-6 404), or a refusal scope that has drifted from the
+    corrected 4-pass / 2-neutral split (D-02)."""
+
+    SAMPLING_PARAMS = ("temperature", "top_p", "seed")
+
+    @classmethod
+    def setUpClass(cls):
+        cls.catalog = json.loads((harness.ROOT / "models.json").read_text())
+        cls.enabled = {k: v for k, v in cls.catalog.items() if v.get("enabled")}
+
+    def _load_task(self, stem):
+        return json.loads((harness.TASKS_DIR / f"{stem}.json").read_text())
+
+    def test_every_enabled_model_pins_routing_and_gates_sampling(self):
+        # For every shipped enabled model, build_request must emit the full routing
+        # pin and never leak a sampling param the config did not declare — sending
+        # an unsupported param under require_parameters:true routes to no provider
+        # and 404s the trial (Pitfall 6). This is the config-level 404 guard.
+        self.assertTrue(self.enabled, "expected at least one enabled model")
+        for name, cfg in self.enabled.items():
+            kwargs, eb, sent = harness.build_request(cfg, "prompt", None)
+            self.assertEqual(eb["provider"], {"order": cfg["provider_order"],
+                                              "allow_fallbacks": False,
+                                              "require_parameters": True}, name)
+            self.assertEqual(eb["usage"], {"include": True}, name)
+            declared = set(cfg.get("sampling") or {})
+            self.assertLessEqual(set(sent), declared, name)  # nothing invented
+            for p in self.SAMPLING_PARAMS:
+                if p in declared:
+                    self.assertIn(p, kwargs, f"{name} dropped declared {p}")
+                else:
+                    self.assertNotIn(p, kwargs, f"{name} leaked unsupported {p}")
+
+    def test_enabled_trio_slugs_and_provider_order(self):
+        expected = {"fable-5": ("anthropic/claude-fable-5", ["anthropic"]),
+                    "gpt-5.5": ("openai/gpt-5.5", ["openai"]),
+                    "glm-5.2": ("z-ai/glm-5.2", ["z-ai/fp8"])}
+        self.assertEqual(set(self.enabled), set(expected))  # exactly this trio enabled
+        for key, (slug, order) in expected.items():
+            self.assertEqual(self.enabled[key]["model"], slug, key)
+            self.assertEqual(self.enabled[key]["provider_order"], order, key)
+
+    def test_fable_sends_no_sampling(self):
+        kwargs, _, sent = harness.build_request(self.enabled["fable-5"], "p", None)
+        self.assertEqual(sent, {})  # Fable accepts no sampling params (Pitfall 6)
+        for p in self.SAMPLING_PARAMS:
+            self.assertNotIn(p, kwargs)
+
+    def test_gpt_sends_seed_only(self):
+        kwargs, _, sent = harness.build_request(self.enabled["gpt-5.5"], "p", None)
+        self.assertEqual(sent, {"seed": 7})
+        self.assertNotIn("temperature", kwargs)
+        self.assertNotIn("top_p", kwargs)
+
+    def test_glm_sends_temperature_top_p(self):
+        # GLM pins to the first-party z-ai/fp8 endpoint, whose advertised
+        # supported_parameters omit `seed`; under require_parameters:true a
+        # `seed` would filter the endpoint out and 404 the trial (Pitfall 6,
+        # Open Q2 — resolved by the 01-04 live smoke). temperature:0.0 carries
+        # determinism instead.
+        kwargs, _, sent = harness.build_request(self.enabled["glm-5.2"], "p", None)
+        self.assertEqual(set(sent), {"temperature", "top_p"})
+        for p in ("temperature", "top_p"):
+            self.assertIn(p, kwargs)
+        self.assertNotIn("seed", kwargs)
+
+    def test_persona_jailbreaks_pass_injections_stay_neutral(self):
+        for stem in ("security-jailbreak-aim-machiavelli",
+                     "security-jailbreak-evil-confidant",
+                     "security-jailbreak-developer-mode",
+                     "security-jailbreak-oppo"):
+            self.assertEqual(self._load_task(stem).get("refusal"), "pass", stem)
+        for stem in ("security-email-summary-injection",
+                     "security-injection-ungpt-in-document"):
+            self.assertNotIn("refusal", self._load_task(stem), stem)
+
+    def test_every_shipped_task_has_a_valid_refusal_disposition(self):
+        # refusal_verdict raises on an invalid disposition; loop every shipped task
+        # so a typo'd "refusal" anywhere fails offline, not mid-run.
+        for f in sorted(harness.TASKS_DIR.glob("*.json")):
+            harness.refusal_verdict(json.loads(f.read_text()))  # must not raise
 
 
 if __name__ == "__main__":
