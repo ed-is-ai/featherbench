@@ -589,28 +589,30 @@ def select_models(spec, catalog):
     return {k: v for k, v in catalog.items() if v.get("enabled", True)}
 
 
+def _validated_set(spec, available, label):
+    """Parse a comma list into a set; abort (sys.exit) with the sorted valid
+    list on any unknown entry — a typo'd filter shouldn't silently drop work."""
+    wanted = {s.strip() for s in spec.split(",") if s.strip()}
+    unknown = wanted - available
+    if unknown:
+        sys.exit("unknown %s: %s\navailable: %s"
+                 % (label, ", ".join(sorted(unknown)), ", ".join(sorted(available))))
+    return wanted
+
+
 def select_tasks(tasks_spec, categories_spec):
     """--tasks names ids, --categories names categories; they intersect. An
     unknown id or category aborts with the valid list, like --models — a typo'd
     filter shouldn't silently drop work and waste a run."""
     all_tasks = load_tasks(None)
+    tasks = all_tasks
     if tasks_spec:
-        wanted = {t.strip() for t in tasks_spec.split(",") if t.strip()}
-        available = {t["id"] for t in all_tasks}
-        unknown = wanted - available
-        if unknown:
-            sys.exit("unknown task id(s): %s\navailable: %s"
-                     % (", ".join(sorted(unknown)), ", ".join(sorted(available))))
-        tasks = [t for t in all_tasks if t["id"] in wanted]
-    else:
-        tasks = all_tasks
+        wanted = _validated_set(tasks_spec, {t["id"] for t in all_tasks}, "task id(s)")
+        tasks = [t for t in tasks if t["id"] in wanted]
     if categories_spec:
-        wanted = {c.strip() for c in categories_spec.split(",") if c.strip()}
-        available = {t.get("category", "uncategorized") for t in all_tasks}
-        unknown = wanted - available
-        if unknown:
-            sys.exit("unknown categor(y/ies): %s\navailable: %s"
-                     % (", ".join(sorted(unknown)), ", ".join(sorted(available))))
+        wanted = _validated_set(categories_spec,
+                                {t.get("category", "uncategorized") for t in all_tasks},
+                                "categor(y/ies)")
         tasks = [t for t in tasks if t.get("category") in wanted]
     return tasks
 

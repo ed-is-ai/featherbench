@@ -406,10 +406,16 @@ class TestProvidersAndSelection(unittest.TestCase):
             harness.select_models("nope", catalog)
 
     def test_select_tasks_unknown_id_or_category_exits(self):
-        with self.assertRaises(SystemExit):
+        with self.assertRaises(SystemExit) as cm:
             harness.select_tasks("no-such-task-xyz", None)
-        with self.assertRaises(SystemExit):
+        msg = str(cm.exception)
+        self.assertTrue(msg.startswith("unknown task id(s):"), msg)
+        self.assertIn("available:", msg)
+        with self.assertRaises(SystemExit) as cm:
             harness.select_tasks(None, "no-such-category-xyz")
+        msg = str(cm.exception)
+        self.assertTrue(msg.startswith("unknown categor(y/ies):"), msg)
+        self.assertIn("available:", msg)
 
     def test_cost_comes_from_the_stream_not_a_price_table(self):
         # cost is no longer computed from a pricing table; it arrives on the
