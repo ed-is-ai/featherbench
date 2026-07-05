@@ -22,10 +22,15 @@ Cost (USD), and latency come out **directly comparable** across models, so you
 can pick the cheapest model that still clears your bar with numbers you generated
 on your own workload.
 
-The whole thing is a single-file harness. Every model is reached through one
-routing-pinned [OpenRouter](https://openrouter.ai) integration — one API, one
-key, comparable cost and latency for every model — and each run lands as JSONL,
-a Markdown summary, and a self-contained HTML review page.
+**A featherweight framework for building your own LLM benchmarks.**
+
+Featherbench is a single-file harness for creating **your own benchmarks** and
+measuring LLM performance on **real-world workloads** — the messy,
+domain-specific tasks you actually care about, not just the public leaderboards.
+Every model is reached through one routing-pinned
+[OpenRouter](https://openrouter.ai) integration — one API, one key, comparable
+cost and latency for every model — and each run lands as JSONL, a Markdown
+summary, and a self-contained HTML review page.
 
 **Design goals — why "featherweight":**
 
