@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Cross-model eval harness: GLM-5.2 vs GPT-5.5 vs Claude Fable 5.
+"""Cross-model eval harness.
 
 Runs every task in tasks/ against every model in models.json, N trials each.
 Each run writes its own timestamped set of files — results/results-<ts>.jsonl,
@@ -14,7 +14,7 @@ benchmark numbers produced on different scaffolds.
 Usage:
     python3 eval.py                          # all tasks x all models, 1 trial
     python3 eval.py --trials 3               # 3 trials per (task, model)
-    python3 eval.py --models fable-5,glm-5.2 --tasks coding-csv-dedupe
+    python3 eval.py --models keyA,keyB --tasks coding-csv-dedupe
     python3 eval.py --dry-run                # list what would run
 
 Layout (one file, five layers):
@@ -58,8 +58,7 @@ RESOURCES_DIR = ROOT / "resources"
 #
 # One provider path: every model is called through call_openrouter, a single
 # pinned OpenRouter chat/completions stream. build_request / reduce_stream /
-# map_refusal are pure helpers (no I/O) so the routing pin, sampling gating,
-# TTFT clock and refusal mapping are all unit-testable without spending a token.
+# map_refusal are pure (no I/O), so each is unit-testable without spending a token.
 
 @dataclass
 class ModelResponse:
@@ -72,7 +71,7 @@ class ModelResponse:
     tool_calls: list = field(default_factory=list)
     input_tokens: int = None
     output_tokens: int = None
-    latency_s: float = None  # TTFT: time to first *content* token (D-04)
+    latency_s: float = None  # TTFT: time to first *content* token
     cost_usd: float = None  # USD actually charged, read from usage.cost
     wall_clock_s: float = None  # full stream duration (thinking + content)
     sampling_sent: dict = field(default_factory=dict)  # sampling params actually sent
@@ -87,10 +86,10 @@ def build_request(cfg, prompt, tools=None):
 
     Every request is pinned to the labeled provider (provider.order +
     allow_fallbacks:false + require_parameters:true) so no silent fallback or
-    quantized endpoint scores a different model than the one labeled (D-08).
+    quantized endpoint scores a different model than the one labeled.
     Only the sampling params listed in cfg["sampling"] are sent: with
     require_parameters:true, sending a param the model's provider does not support
-    routes to no provider and 404s the trial (Pitfall 6), so gating is mandatory.
+    routes to no provider and 404s the trial, so gating is mandatory.
     """
     extra_body = {"provider": {"order": cfg["provider_order"],
                                "allow_fallbacks": False,
@@ -98,8 +97,8 @@ def build_request(cfg, prompt, tools=None):
                   "usage": {"include": True}}
     if cfg.get("effort"):
         # Unified reasoning control — the nested reasoning:{effort}, not a
-        # top-level reasoning_effort (a silent no-op for Claude over OpenRouter,
-        # Pitfall 5). Omitted entirely for models with no effort key.
+        # top-level reasoning_effort (a silent no-op). Omitted entirely for
+        # models with no effort key.
         extra_body["reasoning"] = {"effort": cfg["effort"]}
     sampling_sent = {p: cfg["sampling"][p]
                      for p in ("temperature", "top_p", "seed")
@@ -120,7 +119,7 @@ def reduce_stream(chunks, t0, now=time.monotonic):
 
     Returns a dict — text, ttft, wall, input_tokens, output_tokens, cost,
     finish_reason, native_finish_reason, tool_calls. TTFT is stamped at the first
-    non-empty content delta (reasoning/thinking deltas are ignored, D-04); wall is
+    non-empty content delta (reasoning/thinking deltas are ignored); wall is
     stamped after the final chunk; cost and tokens come from the final usage-only
     chunk (empty .choices). `now` is injectable so the clock is deterministic
     under test.
@@ -164,7 +163,7 @@ def reduce_stream(chunks, t0, now=time.monotonic):
 def map_refusal(finish_reason, native_finish_reason, message):
     """PURE: map the (possibly native) finish reason to (refusal, category).
 
-    Provider signal first (D-01): a normalized content_filter, or a native
+    Provider signal first: a normalized content_filter, or a native
     refusal/content_filter/safety stop, is a hard refusal. The OpenAI-compat path
     rarely carries a structured category, so category is usually None.
     """
@@ -178,10 +177,8 @@ def call_openrouter(cfg, prompt, tools=None):
     """The single provider path: stream one pinned OpenRouter chat request and
     fold it into a ModelResponse.
 
-    Every model — Claude, GPT, GLM — runs through here, so cost, TTFT/wall-clock,
-    sampling and refusal are all measured the same way and stay comparable. The
-    request is pinned (see build_request) so no fallback re-serves another model;
-    a safety refusal is recorded (refusal=True), never transparently re-served.
+    Every model runs through here, so cost, TTFT/wall-clock, sampling and refusal
+    are all measured the same way and stay comparable (pinned in build_request).
     The API key is read only from the environment and never leaves this function.
     """
     from openai import OpenAI
@@ -201,11 +198,8 @@ def call_openrouter(cfg, prompt, tools=None):
 
 
 def _is_rate_limit(exc):
-    """True for rate-limit / 429 errors, without importing any provider SDK.
-
-    The OpenAI SDK's RateLimitError carries status_code 429; we also fall back to
-    the exception's type name / message so any client raising a rate-limit error
-    is retried the same way."""
+    """True for rate-limit / 429 errors, without importing any provider SDK:
+    match status_code 429, or the exception's type name / message."""
     status = getattr(exc, "status_code", None) or getattr(
         getattr(exc, "response", None), "status_code", None)
     if status == 429:
@@ -230,7 +224,7 @@ def _is_transient(exc):
     404 is the require_parameters:true routing-pin miss (a mislabeled-model
     misconfiguration): it must fail loudly and immediately, never be masked as a
     transient retry, or the benchmark scores an endpoint that is not the one
-    labeled. This is the fidelity guard (REL-01)."""
+    labeled. This is the fidelity guard."""
     status = getattr(exc, "status_code", None) or getattr(
         getattr(exc, "response", None), "status_code", None)
     if status in _TRANSIENT_STATUS:
@@ -249,12 +243,11 @@ def call_with_retry(cfg, prompt, tools=None, retries=4, base_delay=2.0):
     A full-catalog x N-trials run reliably hits 429s and the occasional 5xx /
     connection reset / read timeout; without this each becomes an error record and
     silently thins the dataset. Only transient failures (429, 5xx, connection,
-    timeout) are retried — non-transient errors (bad request, auth, and above all
-    a routing-pin 404) are re-raised immediately so a mislabeled-model
-    misconfiguration fails loudly instead of being masked. Backoff is jittered
-    (base_delay * 2**attempt + uniform(0, base_delay)) to avoid a thundering herd
-    under --concurrency > 1. Latency is measured per attempt inside call_openrouter, so
-    the recorded latency_s reflects the successful call, not the waits.
+    timeout) are retried; non-transient errors are re-raised immediately (see
+    _is_transient). Backoff is jittered (base_delay * 2**attempt +
+    uniform(0, base_delay)) to avoid a thundering herd under --concurrency > 1.
+    Latency is measured per attempt inside call_openrouter, so the recorded
+    latency_s reflects the successful call, not the waits.
     """
     for attempt in range(retries + 1):
         try:
@@ -324,8 +317,7 @@ def check_tool_called(spec, text, tool_calls):
     """PASS if some tool call matches `tool` (and every arg in `args`, if given).
 
     `arg_match` selects how each arg is compared: "substring" (default, loose),
-    "exact" (normalized equality) or "word" (word-boundary). Default stays loose so
-    existing tool tasks (location~=Paris, destination~=Tokyo) keep passing."""
+    "exact" (normalized equality) or "word" (word-boundary)."""
     name, want = spec["tool"], spec.get("args")
     mode = spec.get("arg_match", "substring")
     for call in tool_calls:
@@ -339,11 +331,9 @@ def check_tool_called(spec, text, tool_calls):
 
 def _arg_match(got, want, mode="substring"):
     """Compare a tool-call arg `got` against the wanted `want` under `mode`.
-
-    substring (default): `want` normalized is a substring of `got` normalized —
-      tolerates 'Paris' matching 'Paris, France'; coerces numbers so 2 matches "2".
-    exact: normalized equality — 'Tokyo' no longer matches 'Tokyostan', '2' not '20'.
-    word: word-boundary match — 'Tokyo' matches 'to Tokyo' but not 'Tokyostan'.
+    substring (default): `want` normalized is a substring of `got` normalized,
+    coercing numbers so 2 matches "2". exact: normalized equality. word:
+    word-boundary match ('Tokyo' matches 'to Tokyo' but not 'Tokyostan').
     """
     g, w = str(got).strip().lower(), str(want).strip().lower()
     if mode == "exact":
@@ -373,8 +363,7 @@ def check_not_contains(spec, text, tool_calls):
     return (not found), (f"forbidden term present: {found!r}" if found else "ok")
 
 
-# Negation cue immediately before a banned term, allowing only light filler between:
-# a bare cue word (no|not|without|never|avoid|omit|skip) or a "*-free"/"free from" token.
+# Negation cue governing a banned term: a bare cue word or a "*-free" token, plus light filler.
 _NEG_CUE = re.compile(
     r"(?:\b(?:no|not|without|never|avoid|omit|skip)\b|[\w-]*free\b)[\s-]*(?:\w+\s+){0,2}$",
     re.I)
@@ -382,12 +371,10 @@ _NEG_CUE = re.compile(
 
 def _negation_aware_present(spec, value, text):
     """Opt-in ("negation_aware": true) presence test that does NOT count a banned
-    term as present when it is negated: either the term itself carries a
-    "-free"/" free" suffix ("bacon-free"), or a negation cue immediately governs it
-    ("no bacon", "without bacon", "fish-free Worcestershire"). A cue only shields a
-    term across light filler and never across a comma/period, so "no salt, then add
-    bacon" still counts bacon. Returns True iff at least one AFFIRMATIVE occurrence
-    exists. (whole_word tasks keep exact semantics on the default, opted-out path.)"""
+    term as present when negated: the term carries a "-free"/" free" suffix, or a
+    negation cue governs it ("no bacon", "without bacon"). A cue shields only across
+    light filler, never across a comma/period ("no salt, then add bacon" still
+    counts bacon). Returns True iff an AFFIRMATIVE occurrence exists."""
     low, val = text.lower(), value.lower()
     n, start = len(val), 0
     while True:
@@ -411,7 +398,7 @@ def _value_present(spec, value, text):
     """Whether `value` occurs in `text`. Case-insensitive substring by default;
     "whole_word": true requires word boundaries (\\bvalue\\b), so 'kill' no longer
     matches 'skill'. Word boundaries treat punctuation as a break, so 'meat' still
-    matches 'meat-free' — reach for a `regex` checker when you need that precision."""
+    matches 'meat-free' — use a `regex` checker for more precision."""
     if spec.get("whole_word"):
         return re.search(r"\b" + re.escape(value) + r"\b", text, re.I) is not None
     return value.lower() in text.lower()
@@ -459,10 +446,9 @@ def extract_code(text):
     """Pick the code block most likely to be the solution.
 
     Prefer the last ```python/```py block — models label their final answer and
-    put it last. Only if nothing is python-tagged do we fall back to the largest
-    block, which dodges the common failure where an answer *ends* with a short
-    untagged example-usage or sample-output fence that the old "last block wins"
-    rule would have run as the solution. Returns None if there are no blocks.
+    put it last. Only if nothing is python-tagged fall back to the largest block,
+    so a trailing untagged example-usage or sample-output fence is not run as the
+    solution. Returns None if there are no blocks.
     """
     blocks = CODE_BLOCK_RE.findall(text)  # [(lang, body), ...]
     if not blocks:
@@ -504,9 +490,8 @@ JUDGE_ANSWER_CAP = 40000  # chars (~8k tokens); rubric answers are prose — thi
 def run_rubric(task, answer, judges):
     """Every judge model scores the answer blind. Returns {judge: {score, rationale}}.
 
-    Using all three contestants as judges makes judge bias measurable (the
-    summary prints a judge x contestant matrix) instead of hidden behind a
-    single 'neutral' judge that is actually one of the contestants.
+    Every contestant also judges, so judge bias is measurable rather than hidden
+    behind a single 'neutral' judge that is itself one of the contestants.
 
     The answer is capped at JUDGE_ANSWER_CAP before judging: a runaway response
     would otherwise be sent in full to every judge (the record's 200k cap is
@@ -531,9 +516,8 @@ def _judge_once(judge_name, cfg, prompt, n_criteria):
     error rather than raising inside run_trial (a bad judge must not kill a trial).
 
     The judge call's real cost (resp.cost_usd, read from usage.cost) is carried on
-    every returned dict so run_trial can aggregate a separate judge_cost_usd — the
-    cost was spent even when the reply is unparseable (RUB-01). Only a call that
-    never returned (the except branch) has unknown cost -> None.
+    every returned dict — the cost was spent even when the reply is unparseable.
+    Only a call that never returned (the except branch) has unknown cost -> None.
     """
     resp = None
     try:
@@ -560,12 +544,9 @@ def _judge_once(judge_name, cfg, prompt, n_criteria):
 
 
 def rubric_mean(scores, exclude=None):
-    """Mean rubric score, leaving out the contestant's own self-score.
-
-    Every contestant is also a judge, so a self-flattering model would inflate
-    its own headline number. Passing `exclude=<contestant>` drops the judge whose
-    name matches (the self-cell). The raw per-judge scores stay in the record, so
-    the judge-bias matrix still shows self-preference. Returns None when no
+    """Mean rubric score, leaving out the contestant's own self-score (a model that
+    also judges would otherwise inflate its own headline). Passing
+    `exclude=<contestant>` drops the judge whose name matches. Returns None when no
     independent judge scored the answer (e.g. a single-model run judging itself).
     """
     vals = [s["score"] for judge, s in (scores or {}).items()
@@ -597,7 +578,7 @@ def load_tasks(task_filter):
 
 def categories_by_id(tasks_by_id):
     """Derive task id -> category from the already-loaded tasks (single source of
-    truth) — no re-scan of tasks/ at report time. Resolves issue #18's ambiguity."""
+    truth) — no re-scan of tasks/ at report time."""
     return {tid: (t.get("category") or "uncategorized") for tid, t in tasks_by_id.items()}
 
 
@@ -660,10 +641,8 @@ def pass_counts(rs):
 
 def wilson_interval(passed, n, z=1.96):
     """95% Wilson score interval for a binomial pass rate, as (lo, hi) fractions.
-
-    Binary checkers over a handful of trials carry huge uncertainty — at n=3 the
-    interval spans ~40 points either way, which is exactly what a reader should
-    see before treating "2/3" as a real number. Returns None when n == 0.
+    Over a handful of trials the interval is wide — that uncertainty is the point,
+    so "2/3" is not mistaken for a real number. Returns None when n == 0.
     """
     if n == 0:
         return None
@@ -700,12 +679,10 @@ def _mixed_hash_tasks(records):
 
 
 def write_summary(records, tasks_by_id, out_path=None):
-    """Aggregate one run's records into a summary markdown file.
-
-    out_path defaults to results/summary.md; the runner passes a per-run
-    results/summary-<ts>.md so runs never overwrite each other. The staleness
-    guard below still fires if a caller hands in records that span task
-    versions (e.g. several run files concatenated by hand)."""
+    """Aggregate one run's records into a summary markdown file. out_path defaults
+    to results/summary.md; the runner passes a per-run results/summary-<ts>.md so
+    runs never overwrite each other. The staleness guard below still fires on
+    records that span task versions (e.g. concatenated run files)."""
     out_path = out_path or (RESULTS_DIR / "summary.md")
     cats = categories_by_id(tasks_by_id)
     by_model = group_by(records, "model")
@@ -821,56 +798,37 @@ def _bias_section(records):
 
 # ---------------------------------------------------------------- html report
 
-# Project mark: the feather lives in resources/featherbench.svg (one editable
-# source of truth, not markup buried in this module). It is read once and
-# INLINED into the report — both as the header logo and, base64-encoded, as the
-# favicon data: URI — so the rendered page stays a single self-contained file
-# with zero external asset requests. Loaded lazily and cached (@functools.cache):
-# importing eval.py never needs the file; only rendering a report does.
 @functools.cache
 def report_icon():
-    """(svg_markup, favicon_data_uri) for the feather mark, read once from
-    resources/featherbench.svg. The markup is inlined into the header; the
-    base64 data: URI is the browser-tab favicon (CSS vars/links do not apply
-    there). Keeping the report self-contained means the SVG is embedded, not
-    linked — the separate file is the editable source, not a runtime fetch."""
+    """(svg_markup, favicon_data_uri) for the feather mark, read once and cached
+    from resources/featherbench.svg (the editable source). Both are INLINED into
+    the report — markup as the header logo, base64 data: URI as the favicon — so
+    the page is self-contained with zero external asset requests. Loaded lazily."""
     svg = (RESOURCES_DIR / "featherbench.svg").read_text().strip()
     favicon = "data:image/svg+xml;base64," + base64.b64encode(svg.encode()).decode()
     return (svg, favicon)
 
 
-# The report's markup, CSS and JS each live in resources/ as one editable source
-# of truth (report.html.j2 / report.css / report.js), same framing as
-# resources/featherbench.svg — not long blobs buried in this module. They are
-# read lazily and cached (@functools.cache), so importing eval.py never touches
-# them; only rendering a report does. The template is one Jinja2 template rather
-# than an f-string/
-# `"".join` HTML builder: autoescape=True escapes every `{{ }}` value, so a model
-# answer containing <script>, & or " renders as text, never live markup
-# (issue #13) — no per-value manual escaping to forget. It is compiled via
-# _REPORT_ENV.from_string(...) (NOT a FileSystemLoader) precisely so autoescape
-# stays on — this is the issue #13 escape guard and must not regress. CSS/JS are
-# passed in as trusted context vars marked `| safe`, so Jinja never parses their
-# {}/}} as delimiters and they need no escaping (first-party, never model
-# output). Static entities (&middot;, &mdash;) are literal template text and so
-# are emitted verbatim — Jinja only escapes interpolated `{{ }}` output.
+# report.html.j2 / report.css / report.js live in resources/ as the editable
+# source of truth, read lazily and cached below. autoescape=True escapes every
+# interpolated `{{ }}` value, so untrusted model text renders as text, never live
+# markup. Trusted first-party CSS/JS are passed as `| safe` context vars (never
+# model output), so Jinja leaves their {}/}} alone and they need no escaping.
 _REPORT_ENV = jinja2.Environment(autoescape=True, trim_blocks=True, lstrip_blocks=True)
 
 
 @functools.cache
 def _report_asset(name):
     """Text of a first-party report asset (report.css / report.js), read once
-    from resources/ and cached. Passed into the template as a `| safe` context
-    var — never model output, so no escaping needed."""
+    from resources/ and cached."""
     return (RESOURCES_DIR / name).read_text()
 
 
 @functools.cache
 def _report_template():
     """Compiled report template, read once from resources/report.html.j2 and
-    cached. Compiled via _REPORT_ENV.from_string(...) so autoescape=True is
-    preserved byte-for-byte — the issue #13 escape guard (do NOT switch to a
-    FileSystemLoader)."""
+    cached. Compiled via _REPORT_ENV.from_string(...), NOT a FileSystemLoader,
+    so autoescape stays on — a FileSystemLoader would silently disable it."""
     return _REPORT_ENV.from_string(
         (RESOURCES_DIR / "report.html.j2").read_text())
 
@@ -878,16 +836,10 @@ def _report_template():
 def write_html_report(records, tasks_by_id, out_path=None):
     """Render one run's report.html: a self-contained, filterable review page.
 
-    Addresses the 'inspect the results file for ...' step every rubric-less task
-    leans on — groups every trial under its task, with pass/fail, refusals,
-    rubric scores + rationales, cost/latency, and the full response text one
-    click away. No external assets, so it opens straight from disk. out_path
-    defaults to results/report.html; the runner passes a per-run
-    results/report-<ts>.html.
-
-    Rendering is a single autoescaping Jinja2 template (resources/report.html.j2):
-    this function only shapes plain data — no HTML strings — so every untrusted
-    model value is escaped by the template, not by a hand-placed escape call.
+    Groups every trial under its task — pass/fail, refusals, rubric scores +
+    rationales, cost/latency, and the full response text one click away. No
+    external assets, so it opens straight from disk. out_path defaults to
+    results/report.html; the runner passes a per-run results/report-<ts>.html.
     """
     out_path = out_path or (RESULTS_DIR / "report.html")
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
@@ -903,10 +855,8 @@ def write_html_report(records, tasks_by_id, out_path=None):
 
 
 def _task_data(tid, rs, task):
-    """Plain-data shape for one task section (no markup) — the template turns it
-    into the <section>: header, category chip, passed/scored meta, optional
-    description + prompt, and one trial card per record. Category comes from the
-    loaded task alone (single source of truth)."""
+    """Plain-data shape for one task section (no markup); the template renders it.
+    Category comes from the loaded task alone (single source of truth)."""
     passed, scored = pass_counts(rs)
     return {
         "tid": tid,
@@ -933,9 +883,7 @@ def _status(r):
 
 def _trial_data(r):
     """Plain-data shape for one trial card (no markup); data-status/data-text
-    drive the client-side filters. Every value here is raw — the template's
-    autoescape turns model text, tool-call names, refusal categories and rubric
-    rationales into escaped output, so none can inject markup."""
+    drive the client-side filters."""
     status, cls, word = _status(r)
     text = r.get("text") or ""
     call_names = " ".join(c.get("name") or "" for c in (r.get("tool_calls") or []))
@@ -995,9 +943,7 @@ def refusal_verdict(task):
     pass/fail denominator — recorded, not scored — because for most tasks a
     refusal is neither the right answer nor a wrong one. A task may override:
     "refusal": "pass" for a prompt it *should* decline (a jailbreak), or "fail"
-    for a benign task it should not have ducked. Refusal handling is task-local
-    precisely because it is: a jailbreak that also asks a benign question (see
-    security-jailbreak-oppo) wants the benign answer, so a blanket rule is wrong.
+    for a benign task it should not have ducked.
     """
     disp = task.get("refusal", "neutral")
     if disp not in REFUSAL_DISPOSITIONS:
@@ -1040,7 +986,7 @@ def run_trial(run_id, task, model_name, cfg, trial, judges):
                 record["rubric_mean"] = rubric_mean(record["rubric"], exclude=model_name)
                 # aggregate the judges' costs into a SEPARATE field — never fold
                 # into record["cost_usd"] (the answer cost), which must stay the
-                # pristine per-model answer cost for cross-model comparison (RUB-01).
+                # pristine per-model answer cost for cross-model comparison.
                 record["judge_cost_usd"] = round(
                     sum(s.get("cost_usd") or 0 for s in record["rubric"].values()), 6)
                 grid = ", ".join(f"{j}:{s.get('score')}" for j, s in record["rubric"].items())
@@ -1061,10 +1007,9 @@ def run_all_trials(work, run_id, judges, writer, concurrency):
     item.
 
     With concurrency > 1 the trials run in a thread pool, but writer is invoked
-    only on the calling thread (as each future completes), so it needs no lock
-    and each record still lands the moment its trial finishes — a mid-run crash
-    keeps everything already done. Order is completion order, not submission
-    order; records carry task/model/trial so that doesn't matter.
+    only on the calling thread (as each future completes), so it needs no lock and
+    each record lands as its trial finishes — a mid-run crash keeps what is done.
+    Order is completion order; records carry task/model/trial, so that is fine.
     """
     def one(item):
         task, (model_name, cfg), trial = item
@@ -1086,7 +1031,7 @@ def _load_records(path):
     The path is caller-supplied, so every line is parsed under its own
     try/except: a garbled, truncated or oversized line from a partially-written
     or hostile file is treated as an absent cell — never eval'd, never crashes the
-    loader (REL-02 / RESEARCH Security V5). Blank lines are skipped."""
+    loader. Blank lines are skipped."""
     records = []
     with open(path, encoding="utf-8") as fh:
         for line in fh:
@@ -1212,9 +1157,7 @@ def main():
 
     RESULTS_DIR.mkdir(exist_ok=True)
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    # A fresh file per run: the summary and report below are built from just this
-    # run's records, so editing a task's prompt or checker between runs can never
-    # blend old trials into the new aggregates.
+    # A fresh file per run so the summary/report below never blend trials across runs.
     results_file = RESULTS_DIR / f"results-{run_id}.jsonl"
     summary_file = RESULTS_DIR / f"summary-{run_id}.md"
     report_file = RESULTS_DIR / f"report-{run_id}.html"
@@ -1224,8 +1167,7 @@ def main():
     # --resume / --rerun-errored: keep the already-completed cells and run only
     # what is left. The kept records seed a FRESH results-<ts>.jsonl (kept + new)
     # so the one-file-per-coherent-run invariant holds and the summary/report
-    # cover the full matrix. A changed task (different task_hash) is stale and is
-    # re-run, never reused as a success (remaining_work, the fidelity guard).
+    # cover the full matrix (stale changed-task cells re-run — see remaining_work).
     seed_records = []
     if resume_path:
         mode = "rerun-errored" if args.rerun_errored else "resume"
