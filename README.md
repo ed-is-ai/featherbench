@@ -3,20 +3,29 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue.svg)](pyproject.toml)
 
-**A featherweight framework for building your own LLM benchmarks.**
+**Find the cheapest, smallest, fastest model that is still good enough for _your_ workload.**
 
-Featherbench is a single-file harness for creating **your own benchmarks** and
-measuring LLM performance on **real-world workloads** — the messy,
-domain-specific tasks you actually care about, not just the public leaderboards.
+Picking a model is now a cost-and-latency decision as much as a capability one.
+The pressure is to minimize tokens, spend, and latency by running the *smallest*
+model that still clears your bar — and "good enough" is defined by your own
+application, not a public leaderboard. The open question is rarely "which model
+is best in the abstract"; it's "is this cheaper, smaller model good enough for
+the tasks *I* actually run?"
 
-You write tasks as small JSON files. Every task runs through the same scaffold
-against every model you select, with the same prompt and the same pass/fail
-checker, so the numbers are **directly comparable** across models — unlike
-vendor-reported benchmark scores produced on different harnesses. Every model
-is reached through a single, routing-pinned [OpenRouter](https://openrouter.ai)
-integration — one API, one key, comparable cost and latency for every model —
-and results land as JSONL, a Markdown summary, and a self-contained HTML review
-page.
+Vendor-reported benchmark numbers can't answer that. They're produced on
+different harnesses, with different prompts and settings, so they don't line up
+head-to-head — and they measure their tasks, not yours. Featherbench closes the
+gap: you write your own real-world tasks as small JSON files and run every model
+you select through **one shared scaffold** — same prompt, same pass/fail
+checkers, same effort settings, same latency clock, same cost math. Pass rate,
+Cost (USD), and latency come out **directly comparable** across models, so you
+can pick the cheapest model that still clears your bar with numbers you generated
+on your own workload.
+
+The whole thing is a single-file harness. Every model is reached through one
+routing-pinned [OpenRouter](https://openrouter.ai) integration — one API, one
+key, comparable cost and latency for every model — and each run lands as JSONL,
+a Markdown summary, and a self-contained HTML review page.
 
 **Design goals — why "featherweight":**
 
@@ -33,12 +42,13 @@ page.
   optional cross-judged LLM rubric for the rest.
 - **Everything through one scaffold.** Same prompt, same effort settings, same
   latency clock, same cost math for every model — so comparisons are apples to
-  apples.
+  apples and the quality-vs-cost tradeoff is a fair read, not an artifact of
+  different harnesses.
 
 If you want a heavyweight platform with a UI, tracing, and dataset versioning,
 use Inspect AI / promptfoo / Braintrust. If you want to stand up a bespoke
-benchmark for your domain in an afternoon and keep full control of the scaffold,
-this is that.
+benchmark for your domain in an afternoon — to decide which model is good enough
+at the lowest cost — and keep full control of the scaffold, this is that.
 
 ## Setup
 
