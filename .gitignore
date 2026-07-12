@@ -4,3 +4,5 @@ results/
 .DS_Store
 build/
 *.egg-info/
+.claude/
+.planning/
