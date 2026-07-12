@@ -8,12 +8,12 @@
     "checks": [
       {
         "type": "regex",
-        "pattern": "(?is)as an?\\b[^\\n]{2,70}\\bi want\\b[^\\n]{2,160}\\bso that\\b",
+        "pattern": "(?is)as an?\\b[\\s\\S]{2,140}?\\bi want\\b[\\s\\S]{2,300}?\\bso that\\b",
         "label": "at least one full 'As a / I want / so that' story"
       },
       {
         "type": "regex",
-        "pattern": "(?is)(as an?\\b[^\\n]{2,70}\\bi want\\b.*?){2,}",
+        "pattern": "(?is)as an?\\b[\\s\\S]{2,140}?\\bi want\\b[\\s\\S]+?as an?\\b[\\s\\S]{2,140}?\\bi want\\b",
         "label": "more than one user story"
       },
       {

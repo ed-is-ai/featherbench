@@ -18,12 +18,12 @@
       },
       {
         "type": "regex",
-        "pattern": "(?i)long run",
+        "pattern": "(?i)long\\s+(run|easy)|miles?\\s+long\\b|longest\\s+run",
         "label": "includes long runs"
       },
       {
         "type": "regex",
-        "pattern": "(?i)taper",
+        "pattern": "(?i)(taper|shakeout|race\\s*week|wind[- ]?down)",
         "label": "includes a taper"
       },
       {

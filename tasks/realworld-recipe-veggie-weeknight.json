@@ -28,7 +28,7 @@
       },
       {
         "type": "regex",
-        "pattern": "(?i)serves?\\s*:?\\s*6|for\\s+6\\b|6\\s+people",
+        "pattern": "(?i)serv\\w*[^0-9\\n]{0,20}\\b6\\b|for\\s+6\\b|6\\s+people|six\\s+(people|servings|portions)",
         "label": "states it serves 6"
       },
       {
