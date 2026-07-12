@@ -437,17 +437,22 @@ CODE_BLOCK_RE = re.compile(r"```(\w+)?\n(.*?)```", re.S)
 def extract_code(text):
     """Pick the code block most likely to be the solution.
 
-    Prefer the last ```python/```py block — models label their final answer and
-    put it last. Only if nothing is python-tagged fall back to the largest block,
-    so a trailing untagged example-usage or sample-output fence is not run as the
-    solution. Returns None if there are no blocks.
+    Prefer the last ```python/```py block that defines a function or class —
+    models often follow the solution with a demo/verification block (REPL
+    `>>>` lines or bare calls), and running that instead of the solution
+    fails the tests on a SyntaxError/NameError. Among python-tagged blocks
+    with no `def`/`class` anywhere, fall back to the last one; with nothing
+    python-tagged fall back to the largest block, so a trailing untagged
+    example-usage or sample-output fence is not run as the solution.
+    Returns None if there are no blocks.
     """
     blocks = CODE_BLOCK_RE.findall(text)  # [(lang, body), ...]
     if not blocks:
         return None
     python = [body for lang, body in blocks if (lang or "").lower() in ("python", "py")]
     if python:
-        return python[-1]
+        defining = [b for b in python if re.search(r"^\s*(def|class)\s", b, re.M)]
+        return (defining or python)[-1]
     return max((body for _, body in blocks), key=len)
 
 
