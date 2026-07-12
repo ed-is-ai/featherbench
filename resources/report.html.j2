@@ -34,7 +34,7 @@
 {% endif %}
 {% if t.tool_calls_rendered %}<div class='detail'><span class='k'>tool calls:</span> {{ t.tool_calls_rendered }}</div>
 {% endif %}
-{% if t.rubric %}<div class='rubric'><span class='k'>rubric</span> {% if t.rubric_mean is not none %}mean {{ "%.1f"|format(t.rubric_mean) }}{% endif %} {% for c in t.rubric %}<span class='chip'>{{ c.judge }}: {% if c.score is not none %}{{ c.score }}{% else %}&mdash;{% endif %}{% if c.scores %} {% for s in c.scores %}<span class='subchip'>{{ s }}</span>{% endfor %}{% endif %}</span>{% endfor %}{% for c in t.rubric %}{% if c.rationale %}<div class='rat'>{{ c.judge }}: {{ c.rationale }}</div>{% endif %}{% endfor %}</div>
+{% if t.rubric %}<div class='rubric'><span class='k'>rubric</span> {% if t.rubric_mean is not none %}mean {{ "%.1f"|format(t.rubric_mean) }}{% endif %} {% for c in t.rubric %}<span class='chip'>{{ c.judge }}: {% if c.score is not none %}{{ c.score }}{% else %}&mdash;{% endif %}{% if c.scores %} {% for s in c.scores %}<span class='subchip'>{{ s }}</span>{% endfor %}{% endif %}</span>{% endfor %}{% for c in t.rubric %}{% if c.rationale and c.judge != t.model %}<div class='rat'>{{ c.judge }}: {{ c.rationale }}</div>{% endif %}{% endfor %}</div>
 {% endif %}
 {% if t.text %}<details class='resp'><summary>response ({{ t.text_len }} chars)</summary><pre>{{ t.text }}</pre></details>
 {% endif %}
