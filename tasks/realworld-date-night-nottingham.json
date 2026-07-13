@@ -23,7 +23,7 @@
       },
       {
         "type": "regex",
-        "pattern": "(?i)(under\\s*£?\\s*30|budget|cheap|free)",
+        "pattern": "(?i)(under[\\s\\-–—]*£?\\s*30|budget|cheap|free)",
         "label": "acknowledges the under-£30 budget option"
       },
       {
