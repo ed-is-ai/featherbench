@@ -1,6 +1,7 @@
 {
   "id": "coding-debug-money-split",
   "category": "coding",
+  "refusal": "fail",
   "description": "Debugging a money-splitting rounding bug. Splitting a total in integer pennies N ways with `total // n` silently loses the remainder, so the shares don't sum back to the total. Correct behaviour: shares sum exactly to the total, differ by at most one penny, and the extra pennies go to the earliest shares. Tests assert the sum invariant, the max-min<=1 fairness bound, and exact expected splits. No crash in the original — inspect expected vs actual.",
   "prompt": "This splits a bill (in whole pennies) evenly between `n` people, but the totals don't reconcile — pennies go missing:\n\n```python\ndef split_bill(total_pennies, n):\n    share = total_pennies // n\n    return [share] * n\n```\n\nExample of the problem:\n\n```\n>>> split_bill(100, 3)\n[33, 33, 33]   # sums to 99, not 100\n```\n\nFix it. Intended behaviour: return a list of `n` integer penny amounts that (a) sum EXACTLY to `total_pennies`, (b) differ from each other by at most one penny, and (c) give the leftover pennies to the earliest people (so 100 split 3 ways is [34, 33, 33]). Keep the name and signature, use only the standard library, and give the final code in a single Python code block.",
   "checker": {

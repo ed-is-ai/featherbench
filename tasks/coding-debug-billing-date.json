@@ -1,6 +1,7 @@
 {
   "id": "coding-debug-billing-date",
   "category": "coding",
+  "refusal": "fail",
   "description": "Debugging, not greenfield writing: given buggy code plus two real tracebacks, produce a fix. Two distinct bugs (December wraps month to 13; day-31 overflows short months) and a spec detail (clamp to the last day of the next month). Tests also cover the already-working cases, so a rewrite that regresses them fails. Stdlib only — the sandbox has no dateutil.",
   "prompt": "This function computes the next monthly billing date for our subscriptions. It's blowing up in production:\n\n```python\nfrom datetime import date\n\ndef next_billing_date(current: date) -> date:\n    \"\"\"Return the billing date one month after `current`.\"\"\"\n    return current.replace(month=current.month + 1)\n```\n\nTwo crashes from the logs:\n\n```\n>>> next_billing_date(date(2026, 12, 15))\nValueError: month must be in 1..12\n\n>>> next_billing_date(date(2026, 1, 31))\nValueError: day is out of range for month\n```\n\nFix it. Intended behaviour: the result is the same day-of-month one calendar month later; if the next month is too short for that day, bill on the LAST day of the next month instead (e.g. 31 Jan 2026 -> 28 Feb 2026, 31 Jan 2024 -> 29 Feb 2024). December must roll over to January of the next year. Keep the function name and signature, use only the Python standard library, and give me the final code in a single Python code block.",
   "checker": {
