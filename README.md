@@ -496,12 +496,15 @@ is copied from its source `summary-<ts>.md`):
 | fable-5 | 74% [55–87] | 1.35 | 7.9 | — ² |
 | glm-5.2 | 93% [77–98] | 0.18 | 13.1 | 8.6 |
 | gpt-5.5 | 93% [77–98] | 1.43 | 13.2 | 8.7 |
-| gpt-5.6-luna | 82% [64–92] | 0.36 | 6.2 | — ¹ |
-| gpt-5.6-sol | 86% [69–94] | 1.32 | 8.6 | — ¹ |
-| gpt-5.6-terra | 89% [73–96] | 0.65 | 3.7 | — ¹ |
+| gpt-5.6-luna | 82% [64–92] | 0.36 | 6.2 | 8.5 ¹ |
+| gpt-5.6-sol | 86% [69–94] | 1.32 | 8.6 | 8.7 ¹ |
+| gpt-5.6-terra | 89% [73–96] | 0.65 | 3.7 | 8.9 ¹ |
 
 Rubric column is single-judge (fable-5). ¹ The gpt-5.6 trio's source run was
-rubric-off, so these cells are blank rather than zero. ² fable-5's own row is
+rubric-off; these scores were judged retroactively (2026-07-14) by fable-5
+against the source run's saved answer text, through the harness's own
+`run_rubric` path (`results-20260713T210031Z-rejudged.jsonl`) — same blind
+prompt and criteria as every other row. ² fable-5's own row is
 blank because it is the judge — it does not score itself. All pass-rate
 confidence intervals are single-trial Wilson intervals (wider than a
 multi-trial run would produce) — treat them as a first read, not a tight
