@@ -98,7 +98,8 @@ on disk. The client picks it up when a model is called
 ### Models
 
 [`models.json`](models.json) is a catalog of selectable models, each keyed by a
-short handle (`fable-5`, `gpt-5.5`, `glm-5.2`, …) and carrying a flat
+short handle (`fable-5`, `gpt-5.5`, `glm-5.2`, `gpt-5.6-luna`, `gpt-5.6-terra`,
+`gpt-5.6-sol`, …) and carrying a flat
 **OpenRouter slug** plus its per-request routing and sampling config. A typical
 entry:
 
@@ -113,7 +114,7 @@ entry:
 ```
 
 - **`model`** is the OpenRouter slug (`anthropic/claude-fable-5`,
-  `openai/gpt-5.5`, `z-ai/glm-5.2`).
+  `openai/gpt-5.5`, `z-ai/glm-5.2`, `openai/gpt-5.6-luna`).
 - **`provider_order`** pins routing to the labelled upstream (e.g. `["z-ai/fp8"]`
   for GLM's first-party fp8 endpoint) — combined with `allow_fallbacks:false`
   and `require_parameters:true`, a run never scores a silent fallback or a
@@ -127,8 +128,8 @@ entry:
 Selection:
 
 - **`enabled: true`** marks the default set — a bare `eval.py` run uses only
-  those (out of the box: `fable-5`, `gpt-5.5`, `glm-5.2`). Flip the flag to
-  change the default panel.
+  those (out of the box: `fable-5`, `gpt-5.5`, `glm-5.2`, `gpt-5.6-luna`,
+  `gpt-5.6-terra`, `gpt-5.6-sol`). Flip the flag to change the default panel.
 - **`--models a,b`** runs exactly those keys, even if disabled (an unknown key
   errors with the list of valid ones).
 - **`--models all`** runs the whole catalog.
@@ -483,6 +484,35 @@ Read the preserved response text in `results.jsonl` / `report.html` for the
 qualitative comparison, and run `--trials 3+` so you report variance, not
 single-shot luck.
 
+## Results
+
+Published numbers from the two source-of-truth runs — one fresh single-trial
+run of the three models with no clean current data, plus the existing
+single-trial gpt-5.6 trio run, hand-collated below (no arithmetic; every cell
+is copied from its source `summary-<ts>.md`):
+
+| Model | Pass rate (95% CI) | Cost (USD) | Median TTFT (s) | Rubric /10 |
+|---|---|---|---|---|
+| fable-5 | 74% [55–87] | 1.35 | 7.9 | — ² |
+| glm-5.2 | 93% [77–98] | 0.18 | 13.1 | 8.6 |
+| gpt-5.5 | 93% [77–98] | 1.43 | 13.2 | 8.7 |
+| gpt-5.6-luna | 82% [64–92] | 0.36 | 6.2 | — ¹ |
+| gpt-5.6-sol | 86% [69–94] | 1.32 | 8.6 | — ¹ |
+| gpt-5.6-terra | 89% [73–96] | 0.65 | 3.7 | — ¹ |
+
+Rubric column is single-judge (fable-5). ¹ The gpt-5.6 trio's source run was
+rubric-off, so these cells are blank rather than zero. ² fable-5's own row is
+blank because it is the judge — it does not score itself. All pass-rate
+confidence intervals are single-trial Wilson intervals (wider than a
+multi-trial run would produce) — treat them as a first read, not a tight
+estimate.
+
+**The gpt-5.6 trio emitted the jailbreak canary in 10 of 12 jailbreak cells** —
+a genuine safety finding, not a harness artifact. fable-5's pass rate falls
+from its earlier published numbers because five benign over-refusals now
+count as a checker FAIL rather than being dropped from the denominator; it is
+also the rubric judge for every model above, itself included.
+
 ## Methodology notes
 
 - **Refusals are recorded, not hidden.** If a safety classifier declines a
@@ -505,6 +535,14 @@ single-shot luck.
   The recorded latency is that of the successful attempt, not the backoff waits.
 - **Checkers are binary and automated**; the LLM rubric is the only judged
   component, and its bias is made visible rather than assumed away.
+- **`is_moderated` splits which refusals are commensurable.** gpt-5.6-luna and
+  gpt-5.6-sol run behind provider-side moderation; gpt-5.6-terra does not. A
+  security-task refusal from a moderated model and a non-refusal from an
+  unmoderated one are not strictly apples-to-apples — check `is_moderated`
+  before comparing refusal behavior across those three.
+- **Only a hard, provider-side stop is scored as a refusal.** A model that
+  declines in prose (rather than tripping the provider's own refusal signal)
+  is scored by the checker like any other answer, not counted as a refusal.
 
 ## License
 
