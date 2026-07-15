@@ -82,6 +82,34 @@ class TestCheckers(unittest.TestCase):
         self.assertTrue(self.check(
             spec, "Strictly no meat, no fish. Use a fish-free Worcestershire and vegetable stock.")[0])
 
+    def _anchovy_ingredient_check(self):
+        task = json.loads(
+            (harness.TASKS_DIR / "realworld-recipe-veggie-weeknight.json").read_text())
+        negated = [s for s in task["checker"]["checks"]
+                   if s.get("type") == "regex" and s.get("negate")]
+        self.assertEqual(len(negated), 1,
+                         "expected exactly one anchovy-ingredient negate sub-check")
+        return negated[0]
+
+    def test_recipe_task_anchovy_label_check_not_flagged(self):
+        spec = self._anchovy_ingredient_check()
+        # regression guard: sonnet-5's actual flagged sentence must now PASS
+        self.assertTrue(self.check(spec,
+            "A quick, warming curry that's naturally vegetarian throughout — just double-check your "
+            "curry paste/stock cube labels, as some brands sneak in fish or anchovy extract.")[0],
+            "advisory label-check sentence must PASS")
+        # genuine ingredient use must still FAIL
+        for t in [
+            "Ingredients:\n- 4 anchovy fillets, finely chopped\n- 2 tbsp olive oil",
+            "Stir in 1 tbsp anchovy paste along with the garlic.",
+        ]:
+            self.assertFalse(self.check(spec, t)[0], f"genuine ingredient use should FAIL: {t!r}")
+        # regression guard: "anchov" must stay out of the generic not_contains list
+        task = json.loads(
+            (harness.TASKS_DIR / "realworld-recipe-veggie-weeknight.json").read_text())
+        nc = [s for s in task["checker"]["checks"] if s.get("type") == "not_contains"][0]
+        self.assertNotIn("anchov", nc["values"], "anchov must stay out of the generic not_contains list")
+
     def test_contains_whole_word(self):
         self.assertTrue(self.check({"type": "not_contains", "value": "kill",
                                     "whole_word": True}, "a useful skill")[0])
