@@ -99,7 +99,7 @@ on disk. The client picks it up when a model is called
 
 [`models.json`](models.json) is a catalog of selectable models, each keyed by a
 short handle (`fable-5`, `gpt-5.5`, `glm-5.2`, `gpt-5.6-luna`, `gpt-5.6-terra`,
-`gpt-5.6-sol`, …) and carrying a flat
+`gpt-5.6-sol`, `haiku-4-5`, `sonnet-4-6`, `sonnet-5`, …) and carrying a flat
 **OpenRouter slug** plus its per-request routing and sampling config. A typical
 entry:
 
@@ -486,35 +486,55 @@ single-shot luck.
 
 ## Results
 
-Published numbers from the two source-of-truth runs — one fresh single-trial
-run of the three models with no clean current data, plus the existing
-single-trial gpt-5.6 trio run, hand-collated below (no arithmetic; every cell
-is copied from its source `summary-<ts>.md`):
+Published numbers from three source-of-truth runs — one fresh single-trial
+run of the three models with no clean current data, the existing single-trial
+gpt-5.6 trio run, and a single-trial reference run of three Claude models not
+in the default panel — hand-collated below (no arithmetic; every cell is
+copied from its source `summary-<ts>.md`):
 
-| Model | Pass rate (95% CI) | Cost (USD) | Median TTFT (s) | Rubric /10 |
-|---|---|---|---|---|
-| fable-5 | 74% [55–87] | 1.35 | 7.9 | — ² |
-| glm-5.2 | 93% [77–98] | 0.18 | 13.1 | 8.6 |
-| gpt-5.5 | 93% [77–98] | 1.43 | 13.2 | 8.7 |
-| gpt-5.6-luna | 82% [64–92] | 0.36 | 6.2 | 8.5 ¹ |
-| gpt-5.6-sol | 86% [69–94] | 1.32 | 8.6 | 8.7 ¹ |
-| gpt-5.6-terra | 89% [73–96] | 0.65 | 3.7 | 8.9 ¹ |
+| Model | Pass rate (95% CI) | Cost (USD) | Median TTFT (s) | Rubric /10 | Default panel |
+|---|---|---|---|---|---|
+| fable-5 | 74% [55–87] | 1.35 | 7.9 | — ² | Yes |
+| glm-5.2 | 93% [77–98] | 0.18 | 13.1 | 8.6 | Yes |
+| gpt-5.5 | 93% [77–98] | 1.43 | 13.2 | 8.7 | Yes |
+| gpt-5.6-luna | 82% [64–92] | 0.36 | 6.2 | 8.5 ¹ | Yes |
+| gpt-5.6-sol | 86% [69–94] | 1.32 | 8.6 | 8.7 ¹ | Yes |
+| gpt-5.6-terra | 89% [73–96] | 0.65 | 3.7 | 8.9 ¹ | Yes |
+| haiku-4-5 | 96% [82–99] | 0.12 | 0.9 | 7.4 ¹ | No |
+| sonnet-4-6 | 96% [82–99] | 1.84 | 7.5 | 8.9 ¹ | No |
+| sonnet-5 | 89% [73–96] ³ | 0.33 | 1.8 | 8.8 ¹ | No |
 
-Rubric column is single-judge (fable-5). ¹ The gpt-5.6 trio's source run was
-rubric-off; these scores were judged retroactively (2026-07-14) by fable-5
-against the source run's saved answer text, through the harness's own
-`run_rubric` path (`results-20260713T210031Z-rejudged.jsonl`) — same blind
-prompt and criteria as every other row. ² fable-5's own row is
-blank because it is the judge — it does not score itself. All pass-rate
+Rubric column is single-judge (fable-5). ¹ The gpt-5.6 trio and the three
+Claude reference models were rubric-off in their source runs; these scores
+were judged retroactively (2026-07-14) by fable-5 against each source run's
+saved answer text, through the harness's own `run_rubric` path
+(`results-20260713T210031Z-rejudged.jsonl`,
+`results-20260714T212403Z-rejudged.jsonl`) — same blind prompt and criteria
+as every other row. ² fable-5's own row is blank because it is the judge — it
+does not score itself. ³ sonnet-5's `recipe-veggie-weeknight` FAIL is a known
+checker false-positive (the forbidden-term check flags an advisory "check
+your stock cube for anchovy extract" line as if it were an ingredient);
+uncorrected pass rate is shown, corrected would be 93% [76–99]. All pass-rate
 confidence intervals are single-trial Wilson intervals (wider than a
 multi-trial run would produce) — treat them as a first read, not a tight
 estimate.
 
 **The gpt-5.6 trio emitted the jailbreak canary in 10 of 12 jailbreak cells** —
-a genuine safety finding, not a harness artifact. fable-5's pass rate falls
-from its earlier published numbers because five benign over-refusals now
-count as a checker FAIL rather than being dropped from the denominator; it is
-also the rubric judge for every model above, itself included.
+a genuine safety finding, not a harness artifact. The Claude trio (haiku-4-5,
+sonnet-4-6, sonnet-5) shows no such pattern — 6/6 on jailbreaks across all
+three. fable-5's pass rate falls from its earlier published numbers because
+five benign over-refusals now count as a checker FAIL rather than being
+dropped from the denominator; it is also the rubric judge for every model
+above, itself included.
+
+**haiku-4-5 is the cheapest model tested** at $0.12 for the full 28-task pass
+with a sub-second median TTFT, but its rubric score (7.4) trails the rest of
+the field by roughly a point and a half — the checker's binary pass/fail
+doesn't capture that gap; the rubric does. Separately, `sonnet-5` and
+`sonnet-4-6` run at identical config (`effort: "high"`, same `max_tokens`)
+but sonnet-4-6 used 3.9x the output tokens and 5.7x the wall-clock time
+across the run for essentially the same rubric quality on most tasks —
+config-matched, not a settings artifact.
 
 ## Methodology notes
 
