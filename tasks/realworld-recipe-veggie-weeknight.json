@@ -17,7 +17,6 @@
           "bacon",
           "pancetta",
           "chorizo",
-          "anchov",
           "fish sauce",
           "worcestershire",
           "gelatine",
@@ -25,6 +24,12 @@
           "tuna",
           "salmon"
         ]
+      },
+      {
+        "type": "regex",
+        "negate": true,
+        "label": "anchovy used as a genuine ingredient (not a label-check warning)",
+        "pattern": "(?i)(\\d+[^.\\n]{0,20}anchov\\w*|anchov\\w*[^.\\n]{0,15}\\b(?:fillets?|paste|essence|tins?)\\b|\\b(?:tins?|fillets?)\\b[^.\\n]{0,15}anchov\\w*|\\b(?:add(?:ed|ing)?|stir(?:s|red)?(?:\\s+in)?|mash(?:ed)?|chop(?:ped)?|mince(?:d)?|dice(?:d)?|includ(?:e|es|ing)|using|use|combine[d]?|blend(?:ed)?|whisk(?:ed)?|fold\\s+in)\\b[^.\\n]{0,20}anchov\\w*)"
       },
       {
         "type": "regex",
