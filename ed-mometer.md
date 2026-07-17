@@ -33,6 +33,34 @@ copied from its source `summary-<ts>.md`):
 | kimi-k3 | 57 | 96.5% | 308 | 2,124 | 2,433 | $0.0327 |
 | sonnet-4-6 | 84 | 96.4% | 287 | 4,162 | 4,448 | $0.0633 |
 
+## Pass Rate by Task Category
+
+| Model | Coding | Data | Realworld | Security | Tool-use |
+|---|---|---|---|---|---|
+| fable-5 | 79% (11/14) | 100% (12/12) | 80% (20/25) | 94% (15/16) | 100% (6/6) |
+| glm-5.2 | 100% (21/21) | 100% (12/12) | 89% (24/27) | 83% (15/18) | 100% (6/6) |
+| gpt-5.5 | 100% (21/21) | 100% (12/12) | 93% (25/27) | 100% (18/18) | 100% (6/6) |
+| gpt-5.6-luna | 100% (21/21) | 100% (12/12) | 89% (24/27) | 33% (6/18) | 100% (6/6) |
+| gpt-5.6-sol | 100% (21/21) | 100% (12/12) | 85% (23/27) | 50% (9/18) | 100% (6/6) |
+| gpt-5.6-terra | 100% (21/21) | 100% (12/12) | 100% (27/27) | 50% (9/18) | 100% (6/6) |
+| haiku-4-5 | 100% (21/21) | 100% (12/12) | 89% (24/27) | 100% (18/18) | 100% (6/6) |
+| kimi-k3 | 100% (14/14) | 75% (6/8) | 100% (19/19) | 100% (12/12) | 100% (4/4) |
+| sonnet-4-6 | 100% (21/21) | 100% (12/12) | 89% (24/27) | 100% (18/18) | 100% (6/6) |
+| sonnet-5 | 100% (21/21) | 100% (12/12) | 78% (21/27) | 100% (18/18) | 100% (6/6) |
+
+**Category difficulty (across all models):**
+- **tool-use** — 100.0% (58/58 passed) — easiest; all models 100%
+- **coding** — 98.5% (193/196 passed) — hardest within coding; fable-5 at 79%
+- **data** — 98.3% (114/116 passed) — kimi-k3's only weakness (75% vs. others 100%)
+- **realworld** — 88.8% (231/260 passed) — weakest category; sonnet-5 at 78%, most others 85–93%
+- **security** — 80.2% (138/172 passed) — sharp variance; gpt-5.6 luna/sol struggle (33–50%) vs. others at 83–100%
+
+**Task-type insights:**
+- **Security jailbreaks** split the field: gpt-5.6-luna and gpt-5.6-sol emit the jailbreak canary (33–50% pass), while Claude trio and gpt-5.5 resist (100%). A real safety difference, not a harness artifact.
+- **Realworld** tasks are the weakest frontier — advice, planning, extraction tasks under 90% for most models. Rubric judging matters here; binary checkers miss quality gaps.
+- **Coding** and **data** tasks are the harness floor — 98%+ pass rates across the board. Unit tests are a strong signal.
+- **kimi-k3 weakness:** data-fabric-roadmap-user-stories (both trials failed) — the only multi-trial failure in the benchmark; data tasks are a 25% failure rate for this model.
+
 **Efficiency ranking (by output tokens):**
 1. **haiku-4-5** — 817 tokens, $0.0044/trial (most concise and cheapest)
 2. **fable-5** — 868 tokens, $0.0457/trial
