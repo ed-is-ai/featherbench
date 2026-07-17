@@ -147,6 +147,12 @@
     "provider_order": ["moonshotai"],
     "sampling": {"temperature": 0.0, "top_p": 1.0}
   },
+  "kimi-k3": {
+    "enabled": false,
+    "model": "moonshotai/kimi-k3",
+    "provider_order": ["moonshotai/int4"],
+    "effort": "max"
+  },
   "qwen3.7-max": {
     "enabled": false,
     "model": "qwen/qwen3.7-max",
