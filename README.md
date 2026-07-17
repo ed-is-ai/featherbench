@@ -186,6 +186,8 @@ python3 eval.py --tasks coding-csv-dedupe,coding-rate-limiter   # run specific t
 python3 eval.py --models opus-4-8,gpt-5.5  # run specific models (even if disabled)
 python3 eval.py --models all               # run the whole catalog
 python3 eval.py --no-rubric                # skip LLM-judged scoring (cheaper)
+python3 eval.py --judge opus-4-8           # pick the rubric judge (default: fable-5)
+python3 eval.py --models glm-5.2 --judge fable-5   # grade one contestant with a non-contestant judge
 python3 eval.py --concurrency 8            # run 8 trials in parallel (serial by default)
 ```
 
@@ -390,14 +392,19 @@ pass/fail floor:
 "rubric": {"criteria": ["Costs are realistic for Lisbon", "Pacing suits a 6-year-old"]}
 ```
 
-When a rubric is present, **every selected model scores every response** blind
-(the judge isn't told which model wrote the answer), 1–10 against the criteria.
-Records gain a `rubric` grid and a `rubric_mean`; the summary gains a *Rubric
-/10* column and a **judge-bias matrix** — the mean score each judge gives each
-contestant. Because every contestant also judges, self-preference shows up as a
-visible number instead of hiding inside a single "neutral" judge that is
-secretly one of the contestants. Each judge's one-line rationale is stored in
-`results.jsonl`.
+When a rubric is present, the **judge model(s)** score every response blind (the
+judge isn't told which model wrote the answer), 1–10 against the criteria. The
+judge defaults to `fable-5` and is set with **`--judge <keys>`** (comma-separated
+for a panel). Judges are resolved from `models.json` and run **even if they
+aren't in `--models`**, so a rubric is graded no matter which contestants ran —
+you can grade one contestant with a disinterested non-contestant judge. Records
+gain a `rubric` grid and a `rubric_mean`; the summary gains a *Rubric /10* column
+and a **judge-bias matrix** — the mean score each judge gives each contestant. A
+judge's own answer is dropped from its headline mean, so a contestant that is
+*also* a judge can't inflate its own score; run a multi-judge panel (or include
+contestants as judges) and self-preference shows up as a visible number in the
+matrix instead of hiding inside one "neutral" judge. Each judge's one-line
+rationale is stored in `results.jsonl`.
 
 Cost: rubric tasks make one extra API call per judge per trial, using the same
 model configs as generation. Skip with `--no-rubric`. Use rubrics for

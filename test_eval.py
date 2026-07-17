@@ -447,6 +447,18 @@ class TestProvidersAndSelection(unittest.TestCase):
         with self.assertRaises(SystemExit):
             harness.select_models("nope", catalog)
 
+    def test_select_judges(self):
+        catalog = {"on": {"enabled": True}, "off": {"enabled": False}}
+        # --no-rubric wins: no judging at all
+        self.assertIsNone(harness.select_judges("on", catalog, True))
+        # default judge resolves from the full catalog, even when disabled...
+        self.assertEqual(set(harness.select_judges("off", catalog, False)), {"off"})
+        # ...and independent of the contestant set (a judge need not be a contestant)
+        self.assertEqual(set(harness.select_judges("on,off", catalog, False)), {"on", "off"})
+        # an unknown judge key aborts rather than silently scoring nothing
+        with self.assertRaises(SystemExit):
+            harness.select_judges("nope", catalog, False)
+
     def test_select_tasks_unknown_id_or_category_exits(self):
         with self.assertRaises(SystemExit) as cm:
             harness.select_tasks("no-such-task-xyz", None)

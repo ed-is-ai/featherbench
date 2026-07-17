@@ -15,6 +15,7 @@ Usage:
     python3 eval.py                          # all tasks x all models, 1 trial
     python3 eval.py --trials 3               # 3 trials per (task, model)
     python3 eval.py --models keyA,keyB --tasks coding-csv-dedupe
+    python3 eval.py --models keyA --judge keyB   # grade keyA's rubric answers with keyB
     python3 eval.py --dry-run                # list what would run
 
 Layout (one file, five layers):
@@ -633,6 +634,18 @@ def _validated_set(spec, available, label):
     return wanted
 
 
+def select_judges(spec, catalog, no_rubric):
+    """Resolve the rubric judge model(s) named by --judge. Returns None when rubric
+    judging is off (--no-rubric) so callers skip judging entirely, else a
+    {key: cfg} map. Judges are looked up in the FULL catalog, not the contestant
+    set, so you can grade contestants with a model that isn't itself a contestant
+    (and it runs even when disabled, like an explicitly named --models key)."""
+    if no_rubric:
+        return None
+    keys = _validated_set(spec, set(catalog), "judge model key(s)")
+    return {k: catalog[k] for k in keys}
+
+
 def select_tasks(tasks_spec, categories_spec):
     """--tasks names ids, --categories names categories; they intersect. An
     unknown id or category aborts with the valid list, like --models — a typo'd
@@ -1164,6 +1177,12 @@ def parse_args():
                     "latency — keep it at 1 when latency is a reported metric.")
     ap.add_argument("--no-rubric", action="store_true",
                     help="skip LLM rubric judging even on tasks that define a rubric")
+    ap.add_argument("--judge", default="fable-5", metavar="KEYS",
+                    help="comma-separated model key(s) from models.json to use as the "
+                    "rubric judge(s) (default: fable-5). Judges are resolved from the "
+                    "catalog and run even if not among --models, so a rubric is graded "
+                    "regardless of which contestants ran. A judge's own answer is "
+                    "excluded from its headline mean. Ignored with --no-rubric.")
     ap.add_argument("--dry-run", action="store_true", help="list what would run, then exit")
     resume = ap.add_mutually_exclusive_group()
     resume.add_argument("--resume", metavar="FILE",
@@ -1186,6 +1205,7 @@ def main():
         sys.exit(f"nothing to run: {len(models)} models, {len(tasks)} tasks selected")
     if args.concurrency < 1:
         sys.exit("--concurrency must be >= 1")
+    judges = select_judges(args.judge, catalog, args.no_rubric)  # fail fast on a bad --judge
     resume_path = args.resume or args.rerun_errored
     if resume_path and not os.path.isfile(resume_path):  # fail fast on a bad path
         sys.exit(f"--resume/--rerun-errored: no such results file: {resume_path}")
@@ -1210,7 +1230,6 @@ def main():
     results_file = RESULTS_DIR / f"results-{run_id}.jsonl"
     summary_file = RESULTS_DIR / f"summary-{run_id}.md"
     report_file = RESULTS_DIR / f"report-{run_id}.html"
-    judges = None if args.no_rubric else {k: v for k, v in models.items() if k == "fable-5"}
 
     work = list(itertools.product(tasks, models.items(), range(1, args.trials + 1)))
     # --resume / --rerun-errored: keep the already-completed cells and run only
