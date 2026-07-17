@@ -501,7 +501,7 @@ copied from its source `summary-<ts>.md`):
 
 | Model | Pass rate (95% CI) | Cost (USD) | Median TTFT (s) | Rubric /10 | Default panel |
 |---|---|---|---|---|---|
-| fable-5 | 74% [55–87] | 1.35 | 7.9 | — ² | Yes |
+| fable-5 | 74% [55–87] | 1.35 | 7.9 | 9.2 ² | Yes |
 | glm-5.2 | 93% [77–98] | 0.18 | 13.1 | 8.6 | Yes |
 | gpt-5.5 | 93% [77–98] | 1.43 | 13.2 | 8.7 | Yes |
 | gpt-5.6-luna | 82% [64–92] | 0.36 | 6.2 | 8.5 ¹ | Yes |
@@ -517,8 +517,12 @@ were judged retroactively (2026-07-14) by fable-5 against each source run's
 saved answer text, through the harness's own `run_rubric` path
 (`results-20260713T210031Z-rejudged.jsonl`,
 `results-20260714T212403Z-rejudged.jsonl`) — same blind prompt and criteria
-as every other row. ² fable-5's own row is blank because it is the judge — it
-does not score itself. ³ sonnet-5's `recipe-veggie-weeknight` FAIL is a known
+as every other row. ² fable-5's 9.2 is a **self-judged** score — fable-5 is the
+judge scoring its own answers, so unlike every other row (which fable-5 judged
+independently) this cell is self-preference-inflated: the judge-bias matrix in
+its source run shows fable-5 rating itself 9.2 versus 8.6–8.7 for the models it
+judges. It is shown for completeness, not as a like-for-like number, pending an
+independent re-judge. ³ sonnet-5's `recipe-veggie-weeknight` FAIL is a known
 checker false-positive (the forbidden-term check flags an advisory "check
 your stock cube for anchovy extract" line as if it were an ingredient);
 uncorrected pass rate is shown, corrected would be 93% [76–99]. All pass-rate
