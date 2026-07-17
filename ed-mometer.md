@@ -18,6 +18,33 @@ copied from its source `summary-<ts>.md`):
 | sonnet-4-6 | 96% [82–99] | 1.84 | 7.5 | 8.9 ¹ | No |
 | sonnet-5 | 89% [73–96] ³ | 0.33 | 1.8 | 8.8 ¹ | No |
 
+## Token Usage
+
+| Model | Trials | Pass % | Input tokens (mean) | Output tokens (mean) | Total tokens (mean) | Cost/trial |
+|---|---|---|---|---|---|---|
+| haiku-4-5 | 84 | 96.4% | 287 | 817 | 1,104 | $0.0044 |
+| fable-5 | 84 | 87.7% | 358 | 868 | 1,226 | $0.0457 |
+| sonnet-5 | 84 | 92.9% | 362 | 1,119 | 1,481 | $0.0119 |
+| glm-5.2 | 84 | 92.9% | 238 | 1,371 | 1,609 | $0.0064 |
+| gpt-5.6-terra | 84 | 89.3% | 220 | 1,478 | 1,699 | $0.0227 |
+| gpt-5.6-sol | 84 | 84.5% | 220 | 1,518 | 1,738 | $0.0466 |
+| gpt-5.5 | 84 | 97.6% | 220 | 1,642 | 1,862 | $0.0504 |
+| gpt-5.6-luna | 84 | 82.1% | 220 | 2,105 | 2,326 | $0.0129 |
+| kimi-k3 | 57 | 96.5% | 308 | 2,124 | 2,433 | $0.0327 |
+| sonnet-4-6 | 84 | 96.4% | 287 | 4,162 | 4,448 | $0.0633 |
+
+**Efficiency ranking (by output tokens):**
+1. **haiku-4-5** — 817 tokens, $0.0044/trial (most concise and cheapest)
+2. **fable-5** — 868 tokens, $0.0457/trial
+3. **sonnet-5** — 1,119 tokens, $0.0119/trial
+4. **glm-5.2** — 1,371 tokens, $0.0064/trial (second-cheapest)
+5. **gpt-5.6-terra** — 1,478 tokens, $0.0227/trial
+6. **gpt-5.6-sol** — 1,518 tokens, $0.0466/trial
+7. **gpt-5.5** — 1,642 tokens, $0.0504/trial (highest pass rate at 97.6%)
+8. **gpt-5.6-luna** — 2,105 tokens, $0.0129/trial
+9. **kimi-k3** — 2,124 tokens, $0.0327/trial (verbose but 96.5% accuracy)
+10. **sonnet-4-6** — 4,162 tokens, $0.0633/trial (runaway verbose)
+
 Rubric column is single-judge (fable-5). ¹ The gpt-5.6 trio and the three
 Claude reference models were rubric-off in their source runs; these scores
 were judged retroactively (2026-07-14) by fable-5 against each source run's
