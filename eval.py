@@ -15,6 +15,7 @@ Usage:
     python3 eval.py                          # all tasks x all models, 1 trial
     python3 eval.py --trials 3               # 3 trials per (task, model)
     python3 eval.py --models keyA,keyB --tasks coding-csv-dedupe
+    python3 eval.py --models keyA --judge keyB   # grade keyA's rubric answers with keyB
     python3 eval.py --dry-run                # list what would run
 
 Layout (one file, five layers):
@@ -360,13 +361,39 @@ _NEG_CUE = re.compile(
     r"(?:\b(?:no|not|without|never|avoid|omit|skip)\b|[\w-]*free\b)[\s-]*(?:\w+\s+){0,2}$",
     re.I)
 
+# A coordinated negated list ("no stock, fish sauce or Worcestershire"): a negation
+# cue then two-or-more short noun items joined by commas and a final or/and/nor. Every
+# member is negated, not just the first. A bare comma clause with no coordinating
+# conjunction ("no salt, then add bacon") is NOT a list, so the later term stays
+# affirmative — the required trailing or/and/nor is what tells the two shapes apart.
+_NEG_LIST_ITEM = r"[a-z][\w-]*(?:\s+[\w-]+){0,3}"
+_NEG_LIST = re.compile(
+    r"\b(?:no|not|without|never|avoid|omit|skip)\b\s+" + _NEG_LIST_ITEM
+    + r"(?:\s*,\s*" + _NEG_LIST_ITEM + r")*"
+    + r"\s*,?\s+(?:or|and|nor)\s+" + _NEG_LIST_ITEM,
+    re.I)
+
+
+def _in_negated_list(low, i, j):
+    """Whether the affirmative term at low[i:j] is a member of a coordinated negated
+    list. The list is bounded to the term's sentence-clause (hard punctuation .;:()),
+    so a following predicate ("...is used") can't be dragged in as a list item."""
+    hard = ".;:()"
+    hstart = max(low.rfind(p, 0, i) for p in hard) + 1
+    ends = [p for p in (low.find(p, j) for p in hard) if p != -1]
+    hend = min(ends) if ends else len(low)
+    rel = i - hstart
+    return any(m.start() <= rel < m.end()
+               for m in _NEG_LIST.finditer(low[hstart:hend]))
+
 
 def _negation_aware_present(spec, value, text):
     """Opt-in ("negation_aware": true) presence test that does NOT count a banned
-    term as present when negated: the term carries a "-free"/" free" suffix, or a
-    negation cue governs it ("no bacon", "without bacon"). A cue shields only across
-    light filler, never across a comma/period ("no salt, then add bacon" still
-    counts bacon). Returns True iff an AFFIRMATIVE occurrence exists."""
+    term as present when negated: the term carries a "-free"/" free" suffix, a
+    negation cue governs it ("no bacon", "without bacon"), or it is a member of a
+    coordinated negated list ("no stock, fish sauce or Worcestershire"). A bare cue
+    shields only across light filler, never across a comma/period ("no salt, then add
+    bacon" still counts bacon). Returns True iff an AFFIRMATIVE occurrence exists."""
     low, val = text.lower(), value.lower()
     n, start = len(val), 0
     while True:
@@ -379,6 +406,8 @@ def _negation_aware_present(spec, value, text):
         segment = re.split(r"[.,;:()]", low[max(0, i - 30):i])[-1]
         if _NEG_CUE.search(segment):
             continue  # a negation cue immediately governs this occurrence
+        if _in_negated_list(low, i, i + n):
+            continue  # member of a coordinated negated list ("no A, B or C")
         return True
 
 
@@ -437,17 +466,22 @@ CODE_BLOCK_RE = re.compile(r"```(\w+)?\n(.*?)```", re.S)
 def extract_code(text):
     """Pick the code block most likely to be the solution.
 
-    Prefer the last ```python/```py block — models label their final answer and
-    put it last. Only if nothing is python-tagged fall back to the largest block,
-    so a trailing untagged example-usage or sample-output fence is not run as the
-    solution. Returns None if there are no blocks.
+    Prefer the last ```python/```py block that defines a function or class —
+    models often follow the solution with a demo/verification block (REPL
+    `>>>` lines or bare calls), and running that instead of the solution
+    fails the tests on a SyntaxError/NameError. Among python-tagged blocks
+    with no `def`/`class` anywhere, fall back to the last one; with nothing
+    python-tagged fall back to the largest block, so a trailing untagged
+    example-usage or sample-output fence is not run as the solution.
+    Returns None if there are no blocks.
     """
     blocks = CODE_BLOCK_RE.findall(text)  # [(lang, body), ...]
     if not blocks:
         return None
     python = [body for lang, body in blocks if (lang or "").lower() in ("python", "py")]
     if python:
-        return python[-1]
+        defining = [b for b in python if re.search(r"^\s*(def|class)\s", b, re.M)]
+        return (defining or python)[-1]
     return max((body for _, body in blocks), key=len)
 
 
@@ -598,6 +632,18 @@ def _validated_set(spec, available, label):
         sys.exit("unknown %s: %s\navailable: %s"
                  % (label, ", ".join(sorted(unknown)), ", ".join(sorted(available))))
     return wanted
+
+
+def select_judges(spec, catalog, no_rubric):
+    """Resolve the rubric judge model(s) named by --judge. Returns None when rubric
+    judging is off (--no-rubric) so callers skip judging entirely, else a
+    {key: cfg} map. Judges are looked up in the FULL catalog, not the contestant
+    set, so you can grade contestants with a model that isn't itself a contestant
+    (and it runs even when disabled, like an explicitly named --models key)."""
+    if no_rubric:
+        return None
+    keys = _validated_set(spec, set(catalog), "judge model key(s)")
+    return {k: catalog[k] for k in keys}
 
 
 def select_tasks(tasks_spec, categories_spec):
@@ -1131,6 +1177,12 @@ def parse_args():
                     "latency — keep it at 1 when latency is a reported metric.")
     ap.add_argument("--no-rubric", action="store_true",
                     help="skip LLM rubric judging even on tasks that define a rubric")
+    ap.add_argument("--judge", default="fable-5", metavar="KEYS",
+                    help="comma-separated model key(s) from models.json to use as the "
+                    "rubric judge(s) (default: fable-5). Judges are resolved from the "
+                    "catalog and run even if not among --models, so a rubric is graded "
+                    "regardless of which contestants ran. A judge's own answer is "
+                    "excluded from its headline mean. Ignored with --no-rubric.")
     ap.add_argument("--dry-run", action="store_true", help="list what would run, then exit")
     resume = ap.add_mutually_exclusive_group()
     resume.add_argument("--resume", metavar="FILE",
@@ -1153,6 +1205,7 @@ def main():
         sys.exit(f"nothing to run: {len(models)} models, {len(tasks)} tasks selected")
     if args.concurrency < 1:
         sys.exit("--concurrency must be >= 1")
+    judges = select_judges(args.judge, catalog, args.no_rubric)  # fail fast on a bad --judge
     resume_path = args.resume or args.rerun_errored
     if resume_path and not os.path.isfile(resume_path):  # fail fast on a bad path
         sys.exit(f"--resume/--rerun-errored: no such results file: {resume_path}")
@@ -1177,7 +1230,6 @@ def main():
     results_file = RESULTS_DIR / f"results-{run_id}.jsonl"
     summary_file = RESULTS_DIR / f"summary-{run_id}.md"
     report_file = RESULTS_DIR / f"report-{run_id}.html"
-    judges = None if args.no_rubric else models
 
     work = list(itertools.product(tasks, models.items(), range(1, args.trials + 1)))
     # --resume / --rerun-errored: keep the already-completed cells and run only

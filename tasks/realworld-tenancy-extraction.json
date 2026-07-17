@@ -33,7 +33,7 @@
       },
       {
         "type": "regex",
-        "pattern": "(?i)(not\\s+(mentioned|stated|specified|covered|addressed)|doesn'?t\\s+(mention|say|cover|specify|address)|does\\s+not\\s+(mention|say|cover|specify|address)|no\\s+(mention|clause|provision)|silent\\s+on|isn'?t\\s+covered|is\\s+not\\s+covered)",
+        "pattern": "(?i)(not[\\s*_]+(mentioned|stated|specified|covered|addressed)|doesn['’]?t[\\s*_]+(mention|say|cover|specify|address)|does[\\s*_]+not[\\s*_]+(mention|say|cover|specify|address)|no[\\s*_]+(mention|clause|provision)|silent[\\s*_]+on|isn['’]?t[\\s*_]+covered|is[\\s*_]+not[\\s*_]+covered)",
         "label": "says the agreement doesn't cover chimney sweeping"
       }
     ]

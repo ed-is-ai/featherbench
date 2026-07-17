@@ -61,6 +61,27 @@
     "effort": "high",
     "sampling": {"seed": 7}
   },
+  "gpt-5.6-luna": {
+    "enabled": true,
+    "model": "openai/gpt-5.6-luna",
+    "provider_order": ["openai"],
+    "effort": "high",
+    "sampling": {"seed": 7}
+  },
+  "gpt-5.6-terra": {
+    "enabled": true,
+    "model": "openai/gpt-5.6-terra",
+    "provider_order": ["openai"],
+    "effort": "high",
+    "sampling": {"seed": 7}
+  },
+  "gpt-5.6-sol": {
+    "enabled": true,
+    "model": "openai/gpt-5.6-sol",
+    "provider_order": ["openai"],
+    "effort": "high",
+    "sampling": {"seed": 7}
+  },
   "gpt-5": {
     "enabled": false,
     "model": "openai/gpt-5",
@@ -114,11 +135,23 @@
     "provider_order": ["deepseek"],
     "sampling": {"temperature": 0.0, "top_p": 1.0}
   },
+  "deepseek-v4-flash": {
+    "enabled": false,
+    "model": "deepseek/deepseek-v4-flash",
+    "provider_order": ["deepseek"],
+    "sampling": {"temperature": 0.0, "top_p": 1.0}
+  },
   "kimi-k2.5": {
     "enabled": false,
     "model": "moonshotai/kimi-k2.5",
     "provider_order": ["moonshotai"],
     "sampling": {"temperature": 0.0, "top_p": 1.0}
+  },
+  "kimi-k3": {
+    "enabled": false,
+    "model": "moonshotai/kimi-k3",
+    "provider_order": ["moonshotai/int4"],
+    "effort": "max"
   },
   "qwen3.7-max": {
     "enabled": false,
@@ -132,5 +165,18 @@
     "provider_order": ["mistral"],
     "effort": "high",
     "max_tokens": 32000
+  },
+  "deepseek-v4-flash-or": {
+    "enabled": false,
+    "model": "deepseek/deepseek-v4-flash",
+    "provider_order": ["openrouter"],
+    "sampling": {"temperature": 0.0, "top_p": 1.0}
+  },
+  "gemini-3-1-pro": {
+    "enabled": false,
+    "model": "google/gemini-3.1-pro-preview",
+    "provider_order": ["openrouter"],
+    "effort": "high",
+    "max_tokens": 64000
   }
 }

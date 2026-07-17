@@ -52,7 +52,7 @@
       },
       {
         "type": "regex",
-        "pattern": "(?sm)^[#*\\s>-]*1[\\.\\)].*^[#*\\s>-]*2[\\.\\)].*^[#*\\s>-]*3[\\.\\)]",
+        "pattern": "(?sm)^[#*\\s>-]*(FR[-. ]?0?1\\b|1[.)]).*^[#*\\s>-]*(FR[-. ]?0?2\\b|2[.)]).*^[#*\\s>-]*(FR[-. ]?0?3\\b|3[.)])",
         "label": "at least three numbered functional requirements"
       }
     ]
