@@ -61,10 +61,18 @@ class TestCheckers(unittest.TestCase):
         self.assertFalse(nc("crumble bacon on top", negation_aware=True))
         # a negation cue earlier in the sentence must not shield a later affirmative use
         self.assertFalse(nc("no salt, then add bacon", negation_aware=True))
+        # a coordinated negated list ("no A, B or C") shields every member, not just the first
+        self.assertTrue(nc("no bacon, ham or pancetta", negation_aware=True))
+        self.assertTrue(nc("no ham, pancetta or bacon", negation_aware=True))
+        # ...but a bare comma clause with no coordinating or/and/nor is not a list
+        self.assertFalse(nc("no ham, then fry the bacon", negation_aware=True))
         # a preceding "-free" token negates a following banned term (fish-free Worcestershire)
         wspec = {"type": "not_contains", "value": "worcestershire", "negation_aware": True}
         self.assertTrue(self.check(wspec, "use a fish-free Worcestershire sauce")[0])
         self.assertFalse(self.check(wspec, "a splash of Worcestershire sauce")[0])
+        # list-negation regression (kimi-k3): a middle and a tail list member both shielded
+        self.assertTrue(self.check(
+            wspec, "no stock, fish sauce or Worcestershire sauce is used")[0])
         # backward-compat: WITHOUT the flag, a negated mention still counts as present (fails)
         self.assertFalse(nc("no bacon"))
         self.assertFalse(nc("bacon-free stock"))
@@ -81,6 +89,12 @@ class TestCheckers(unittest.TestCase):
         # a correct veg answer that negates banned terms no longer false-fails
         self.assertTrue(self.check(
             spec, "Strictly no meat, no fish. Use a fish-free Worcestershire and vegetable stock.")[0])
+        # kimi-k3's actual list-negation answer must PASS (fish sauce + worcestershire shielded)
+        self.assertTrue(self.check(
+            spec, "For depth, no stock, fish sauce or Worcestershire sauce is used.")[0])
+        # genuine list use of the same shape still FAILS
+        self.assertFalse(self.check(
+            spec, "Add bacon, pancetta or chorizo for a meaty hit.")[0])
 
     def _anchovy_ingredient_check(self):
         task = json.loads(

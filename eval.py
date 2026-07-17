@@ -360,13 +360,39 @@ _NEG_CUE = re.compile(
     r"(?:\b(?:no|not|without|never|avoid|omit|skip)\b|[\w-]*free\b)[\s-]*(?:\w+\s+){0,2}$",
     re.I)
 
+# A coordinated negated list ("no stock, fish sauce or Worcestershire"): a negation
+# cue then two-or-more short noun items joined by commas and a final or/and/nor. Every
+# member is negated, not just the first. A bare comma clause with no coordinating
+# conjunction ("no salt, then add bacon") is NOT a list, so the later term stays
+# affirmative — the required trailing or/and/nor is what tells the two shapes apart.
+_NEG_LIST_ITEM = r"[a-z][\w-]*(?:\s+[\w-]+){0,3}"
+_NEG_LIST = re.compile(
+    r"\b(?:no|not|without|never|avoid|omit|skip)\b\s+" + _NEG_LIST_ITEM
+    + r"(?:\s*,\s*" + _NEG_LIST_ITEM + r")*"
+    + r"\s*,?\s+(?:or|and|nor)\s+" + _NEG_LIST_ITEM,
+    re.I)
+
+
+def _in_negated_list(low, i, j):
+    """Whether the affirmative term at low[i:j] is a member of a coordinated negated
+    list. The list is bounded to the term's sentence-clause (hard punctuation .;:()),
+    so a following predicate ("...is used") can't be dragged in as a list item."""
+    hard = ".;:()"
+    hstart = max(low.rfind(p, 0, i) for p in hard) + 1
+    ends = [p for p in (low.find(p, j) for p in hard) if p != -1]
+    hend = min(ends) if ends else len(low)
+    rel = i - hstart
+    return any(m.start() <= rel < m.end()
+               for m in _NEG_LIST.finditer(low[hstart:hend]))
+
 
 def _negation_aware_present(spec, value, text):
     """Opt-in ("negation_aware": true) presence test that does NOT count a banned
-    term as present when negated: the term carries a "-free"/" free" suffix, or a
-    negation cue governs it ("no bacon", "without bacon"). A cue shields only across
-    light filler, never across a comma/period ("no salt, then add bacon" still
-    counts bacon). Returns True iff an AFFIRMATIVE occurrence exists."""
+    term as present when negated: the term carries a "-free"/" free" suffix, a
+    negation cue governs it ("no bacon", "without bacon"), or it is a member of a
+    coordinated negated list ("no stock, fish sauce or Worcestershire"). A bare cue
+    shields only across light filler, never across a comma/period ("no salt, then add
+    bacon" still counts bacon). Returns True iff an AFFIRMATIVE occurrence exists."""
     low, val = text.lower(), value.lower()
     n, start = len(val), 0
     while True:
@@ -379,6 +405,8 @@ def _negation_aware_present(spec, value, text):
         segment = re.split(r"[.,;:()]", low[max(0, i - 30):i])[-1]
         if _NEG_CUE.search(segment):
             continue  # a negation cue immediately governs this occurrence
+        if _in_negated_list(low, i, i + n):
+            continue  # member of a coordinated negated list ("no A, B or C")
         return True
 
 
