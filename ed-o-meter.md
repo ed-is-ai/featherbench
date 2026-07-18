@@ -8,15 +8,31 @@ copied from its source `summary-<ts>.md`):
 
 | Model | Pass rate (95% CI) | Cost (USD) | Median TTFT (s) | Rubric /10 | Default panel |
 |---|---|---|---|---|---|
-| fable-5 | 74% [55–87] | 1.35 | 7.9 | 9.2 ² | Yes |
-| glm-5.2 | 93% [77–98] | 0.18 | 13.1 | 8.6 | Yes |
-| gpt-5.5 | 93% [77–98] | 1.43 | 13.2 | 8.7 | Yes |
-| gpt-5.6-luna | 82% [64–92] | 0.36 | 6.2 | 8.5 ¹ | Yes |
-| gpt-5.6-sol | 86% [69–94] | 1.32 | 8.6 | 8.7 ¹ | Yes |
-| gpt-5.6-terra | 89% [73–96] | 0.65 | 3.7 | 8.9 ¹ | Yes |
 | haiku-4-5 | 96% [82–99] | 0.12 | 0.9 | 7.4 ¹ | No |
 | sonnet-4-6 | 96% [82–99] | 1.84 | 7.5 | 8.9 ¹ | No |
-| sonnet-5 | 89% [73–96] ³ | 0.33 | 1.8 | 8.8 ¹ | No |
+| gpt-5.5 | 96% [82–99] ³ | 1.43 | 13.2 | 8.7 | Yes |
+| glm-5.2 | 93% [77–98] | 0.18 | 13.1 | 8.6 | Yes |
+| kimi-k3 | 93% [77–98] | 0.033 | 26.4 | 9.5 | No |
+| sonnet-5 | 93% [77–98] ³ | 0.33 | 1.8 | 8.8 ¹ | No |
+| gpt-5.6-terra | 89% [73–96] | 0.65 | 3.7 | 8.9 ¹ | Yes |
+| gpt-5.6-sol | 86% [69–94] | 1.32 | 8.6 | 8.7 ¹ | Yes |
+| gpt-5.6-luna | 82% [64–92] | 0.36 | 6.2 | 8.5 ¹ | Yes |
+| fable-5 | 78% [59–89] ³ | 1.35 | 7.9 | 9.2 ² | Yes |
+
+## Quality (Rubric)
+
+| Model | Rubric /10 | Pass rate (95% CI) | Cost (USD) | Median TTFT (s) | Default panel |
+|---|---|---|---|---|---|
+| kimi-k3 | 9.5 | 93% [77–98] | 0.033 | 26.4 | No |
+| fable-5 | 9.2 ² | 78% [59–89] ³ | 1.35 | 7.9 | Yes |
+| gpt-5.6-terra | 8.9 ¹ | 89% [73–96] | 0.65 | 3.7 | Yes |
+| sonnet-4-6 | 8.9 ¹ | 96% [82–99] | 1.84 | 7.5 | No |
+| sonnet-5 | 8.8 ¹ | 93% [77–98] ³ | 0.33 | 1.8 | No |
+| gpt-5.5 | 8.7 | 96% [82–99] ³ | 1.43 | 13.2 | Yes |
+| gpt-5.6-sol | 8.7 ¹ | 86% [69–94] | 1.32 | 8.6 | Yes |
+| glm-5.2 | 8.6 | 93% [77–98] | 0.18 | 13.1 | Yes |
+| gpt-5.6-luna | 8.5 ¹ | 82% [64–92] | 0.36 | 6.2 | Yes |
+| haiku-4-5 | 7.4 ¹ | 96% [82–99] | 0.12 | 0.9 | No |
 
 Rubric column is single-judge (fable-5). ¹ The gpt-5.6 trio and the three
 Claude reference models were rubric-off in their source runs; these scores
@@ -29,13 +45,54 @@ judge scoring its own answers, so unlike every other row (which fable-5 judged
 independently) this cell is self-preference-inflated: the judge-bias matrix in
 its source run shows fable-5 rating itself 9.2 versus 8.6–8.7 for the models it
 judges. It is shown for completeness, not as a like-for-like number, pending an
-independent re-judge. ³ sonnet-5's `recipe-veggie-weeknight` FAIL is a known
-checker false-positive (the forbidden-term check flags an advisory "check
-your stock cube for anchovy extract" line as if it were an ingredient);
-uncorrected pass rate is shown, corrected would be 93% [76–99]. All pass-rate
-confidence intervals are single-trial Wilson intervals (wider than a
-multi-trial run would produce) — treat them as a first read, not a tight
-estimate.
+independent re-judge. ³ **Recipe-checker false-positive, corrected in-table.**
+`realworld-recipe-veggie-weeknight`'s forbidden-term checker flags a
+non-ingredient mention as if it were an ingredient — an advisory label-check
+caution (fable-5: "some stock cubes, Worcestershire-style sauces … contain
+animal products") or a negated omission list (gpt-5.5: "uses no … fish sauce
+or animal-derived garnishes"; sonnet-5: the anchovy advisory). The
+negation-aware `not_contains` shield added in the harness catches sonnet-5's
+phrasing but not fable-5's or gpt-5.5's, so those two still score FAIL under
+the current checker. All three are genuine false-positives and are counted as
+PASS here: gpt-5.5 93%→96% [82–99] (27/28), sonnet-5 89%→93% [77–98] (26/28),
+fable-5 74%→78% [59–89] (21/27). All pass-rate confidence intervals are
+single-trial Wilson intervals (wider than a multi-trial run would produce) —
+treat them as a first read, not a tight estimate.
+
+
+## Efficiency (cost/task)
+
+| Model | Pass % | Input tokens (mean) | Output tokens (mean) | Total tokens (mean) | Cost/trial |
+|---|---|---|---|---|---|
+| haiku-4-5 | 96.4% | 287 | 817 | 1,104 | $0.0044 |
+| glm-5.2 | 92.9% | 238 | 1,371 | 1,609 | $0.0064 |
+| sonnet-5 | 92.9% | 362 | 1,119 | 1,481 | $0.0119 |
+| gpt-5.6-luna | 82.1% | 220 | 2,105 | 2,326 | $0.0129 |
+| gpt-5.6-terra | 89.3% | 220 | 1,478 | 1,699 | $0.0227 |
+| kimi-k3 | 96.5% | 308 | 2,124 | 2,433 | $0.0327 |
+| gpt-5.6-sol | 84.5% | 220 | 1,518 | 1,738 | $0.0466 |
+| gpt-5.5 | 97.6% | 220 | 1,642 | 1,862 | $0.0504 |
+| sonnet-4-6 | 96.4% | 287 | 4,162 | 4,448 | $0.0633 |
+| fable-5 ⁴ | 87.7% | 355 | 1,297 | 1,652 | $0.0684 |
+
+⁴ fable-5's token and cost means are computed over its **answering trials only**
+— the 28 refused trials (which emit near-zero output) are excluded, since
+including them makes the model look artificially concise and cheap. Including
+refusals its output mean would read 868 tokens at $0.0457/trial. No other model
+in this table has refusals, so this adjustment affects only fable-5.
+
+**Efficiency ranking (by cost/task):**
+1. **haiku-4-5** — $0.0044/trial (cheapest, and most concise at 817 tokens)
+2. **glm-5.2** — $0.0064/trial (second-cheapest)
+3. **sonnet-5** — $0.0119/trial
+4. **gpt-5.6-luna** — $0.0129/trial
+5. **gpt-5.6-terra** — $0.0227/trial
+6. **kimi-k3** — $0.0327/trial (verbose at 2,124 tokens but 96.5% accuracy)
+7. **gpt-5.6-sol** — $0.0466/trial
+8. **gpt-5.5** — $0.0504/trial (highest pass rate at 97.6%)
+9. **sonnet-4-6** — $0.0633/trial (runaway verbose at 4,162 tokens)
+10. **fable-5** — $0.0684/trial (most expensive; answering trials only)
+
 
 **The gpt-5.6 trio emitted the jailbreak canary in 10 of 12 jailbreak cells** —
 a genuine safety finding, not a harness artifact. The Claude trio (haiku-4-5,
@@ -54,60 +111,28 @@ but sonnet-4-6 used 3.9x the output tokens and 5.7x the wall-clock time
 across the run for essentially the same rubric quality on most tasks —
 config-matched, not a settings artifact.
 
-## Token Usage
-
-| Model | Trials | Pass % | Input tokens (mean) | Output tokens (mean) | Total tokens (mean) | Cost/trial |
-|---|---|---|---|---|---|---|
-| haiku-4-5 | 84 | 96.4% | 287 | 817 | 1,104 | $0.0044 |
-| fable-5 | 84 | 87.7% | 358 | 868 | 1,226 | $0.0457 |
-| sonnet-5 | 84 | 92.9% | 362 | 1,119 | 1,481 | $0.0119 |
-| glm-5.2 | 84 | 92.9% | 238 | 1,371 | 1,609 | $0.0064 |
-| gpt-5.6-terra | 84 | 89.3% | 220 | 1,478 | 1,699 | $0.0227 |
-| gpt-5.6-sol | 84 | 84.5% | 220 | 1,518 | 1,738 | $0.0466 |
-| gpt-5.5 | 84 | 97.6% | 220 | 1,642 | 1,862 | $0.0504 |
-| gpt-5.6-luna | 84 | 82.1% | 220 | 2,105 | 2,326 | $0.0129 |
-| kimi-k3 | 57 | 96.5% | 308 | 2,124 | 2,433 | $0.0327 |
-| sonnet-4-6 | 84 | 96.4% | 287 | 4,162 | 4,448 | $0.0633 |
-
-**Efficiency ranking (by output tokens):**
-1. **haiku-4-5** — 817 tokens, $0.0044/trial (most concise and cheapest)
-2. **fable-5** — 868 tokens, $0.0457/trial
-3. **sonnet-5** — 1,119 tokens, $0.0119/trial
-4. **glm-5.2** — 1,371 tokens, $0.0064/trial (second-cheapest)
-5. **gpt-5.6-terra** — 1,478 tokens, $0.0227/trial
-6. **gpt-5.6-sol** — 1,518 tokens, $0.0466/trial
-7. **gpt-5.5** — 1,642 tokens, $0.0504/trial (highest pass rate at 97.6%)
-8. **gpt-5.6-luna** — 2,105 tokens, $0.0129/trial
-9. **kimi-k3** — 2,124 tokens, $0.0327/trial (verbose but 96.5% accuracy)
-10. **sonnet-4-6** — 4,162 tokens, $0.0633/trial (runaway verbose)
 
 ## Pass Rate by Task Category
 
 | Model | Coding | Data | Realworld | Security | Tool-use |
 |---|---|---|---|---|---|
-| fable-5 | 79% (11/14) | 100% (12/12) | 80% (20/25) | 94% (15/16) | 100% (6/6) |
-| glm-5.2 | 100% (21/21) | 100% (12/12) | 89% (24/27) | 83% (15/18) | 100% (6/6) |
-| gpt-5.5 | 100% (21/21) | 100% (12/12) | 93% (25/27) | 100% (18/18) | 100% (6/6) |
-| gpt-5.6-luna | 100% (21/21) | 100% (12/12) | 89% (24/27) | 33% (6/18) | 100% (6/6) |
-| gpt-5.6-sol | 100% (21/21) | 100% (12/12) | 85% (23/27) | 50% (9/18) | 100% (6/6) |
-| gpt-5.6-terra | 100% (21/21) | 100% (12/12) | 100% (27/27) | 50% (9/18) | 100% (6/6) |
-| haiku-4-5 | 100% (21/21) | 100% (12/12) | 89% (24/27) | 100% (18/18) | 100% (6/6) |
-| kimi-k3 | 100% (14/14) | 75% (6/8) | 100% (19/19) | 100% (12/12) | 100% (4/4) |
-| sonnet-4-6 | 100% (21/21) | 100% (12/12) | 89% (24/27) | 100% (18/18) | 100% (6/6) |
-| sonnet-5 | 100% (21/21) | 100% (12/12) | 78% (21/27) | 100% (18/18) | 100% (6/6) |
+| haiku-4-5 | 100% | 100% | 89% | 100% | 100% |
+| sonnet-4-6 | 100% | 100% | 89% | 100% | 100% |
+| glm-5.2 | 100% | 100% | 89% | 83% | 100% |
+| gpt-5.5 | 100% | 100% | 93% | 100% | 100% |
+| kimi-k3 | 100% | 75% | 100% | 100% | 100% |
+| gpt-5.6-terra | 100% | 100% | 100% | 50% | 100% |
+| sonnet-5 | 100% | 100% | 78% | 100% | 100% |
+| gpt-5.6-sol | 100% | 100% | 85% | 50% | 100% |
+| gpt-5.6-luna | 100% | 100% | 89% | 33% | 100% |
+| fable-5 | 79% | 100% | 80% | 94% | 100% |
 
-**Category difficulty (across all models):**
-- **tool-use** — 100.0% (58/58 passed) — easiest; all models 100%
-- **coding** — 98.5% (193/196 passed) — hardest within coding; fable-5 at 79%
-- **data** — 98.3% (114/116 passed) — kimi-k3's only weakness (75% vs. others 100%)
-- **realworld** — 88.8% (231/260 passed) — weakest category; sonnet-5 at 78%, most others 85–93%
-- **security** — 80.2% (138/172 passed) — sharp variance; gpt-5.6 luna/sol struggle (33–50%) vs. others at 83–100%
 
 **Task-type insights:**
 - **Security jailbreaks** split the field: gpt-5.6-luna and gpt-5.6-sol emit the jailbreak canary (33–50% pass), while Claude trio and gpt-5.5 resist (100%). A real safety difference, not a harness artifact.
 - **Realworld** tasks are the weakest frontier — advice, planning, extraction tasks under 90% for most models. Rubric judging matters here; binary checkers miss quality gaps.
 - **Coding** and **data** tasks are the harness floor — 98%+ pass rates across the board. Unit tests are a strong signal.
-- **kimi-k3 weakness:** data-fabric-roadmap-user-stories (both trials failed) — the only multi-trial failure in the benchmark; data tasks are a 25% failure rate for this model.
+- **kimi-k3 weakness:** data tasks are its only category weakness (75%), particularly the data-fabric-roadmap-user-stories task.
 
 ## Methodology notes
 
@@ -131,7 +156,7 @@ config-matched, not a settings artifact.
   The recorded latency is that of the successful attempt, not the backoff waits.
 - **Checkers are binary and automated**; the LLM rubric is the only judged
   component, and its bias is made visible rather than assumed away.
-- **`is_moderated` splits which refusals are commensurable.** gpt-5.6-luna and
+- **`is_moderated` splits which refusals are commensurable.** gpt-5.6-luna andß
   gpt-5.6-sol run behind provider-side moderation; gpt-5.6-terra does not. A
   security-task refusal from a moderated model and a non-refusal from an
   unmoderated one are not strictly apples-to-apples — check `is_moderated`
