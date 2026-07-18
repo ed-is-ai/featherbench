@@ -6,21 +6,21 @@
 [![Single file](https://img.shields.io/badge/harness-single%20file-brightgreen.svg)](eval.py)
 [![Models via OpenRouter](https://img.shields.io/badge/models-OpenRouter-6467f2.svg)](https://openrouter.ai)
 
-**Find the cheapest, smallest, fastest model that is still good enough for _your_ workload.**
-More and more people are waking up to the fact that LLMs are expensive.
-The pressure is to minimize tokens, spend, and latency by running the *smallest*
-model that still clears your bar — and "good enough" is defined by your own
-application, not a public leaderboard. 
+**Close the gap between real-world performance and your benchmarks.**
+Public benchmarks are abstract — a score on MMLU is a measure of expected performance in someone's domain, 
+not yours — and increasingly they're optimisation targets the models have already trained against. 
+Meanwhile, at production scale the question that actually matters is finding the smallest model that 
+still clears your bar on quality, cost and latency, measured on the same run. 
 
-The open question is rarely answered by generic benchmarks, 
-the question I get asked "is this cheaper, smaller model good enough for
-the tasks *I* actually run?"  
+To be your customer zero: you need a private task set the models have never seen, 
+run through one harness with everything held constant, so the only variable is the model. 
+It doesn't pretend to be more scientific than the vibe check everyone already does — it just adds a 
+modicum of rigour to it: same prompts every time, a written-down pass bar, costs and latencies recorded, 
+repeatable on every release.
 
-Vendor-reported benchmarks promise much, but prevalent benchmark-maxxing means we
-should not blindly trust them.
-
-Featherbench closes the gap: you write your own real-world tasks as small JSON files and run every model
-you select through **one shared scaffold** — same prompt, same pass/fail
+Featherbench closes the gap between real-world performance and your benchmarks: 
+create your own benchmark by writing your own real-world tasks as small JSON files 
+and run every model you select through **one shared scaffold** — same prompt, same pass/fail
 checkers, same effort settings, same latency clock, same cost math. Pass rate,
 Cost (USD), and latency come out **directly comparable** across models, so you
 can pick the cheapest model that still clears your bar with numbers you generated
