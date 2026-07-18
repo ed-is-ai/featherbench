@@ -125,8 +125,7 @@ config-matched, not a settings artifact.
 | sonnet-5 | 100% | 100% | 78% | 100% | 100% |
 | gpt-5.6-sol | 100% | 100% | 85% | 50% | 100% |
 | gpt-5.6-luna | 100% | 100% | 89% | 33% | 100% |
-| fable-5 | 79% | 100% | 80% | 94% | 100% |
-
+| fable-5 | 79% | 100% | 80% | 100% ⁵ | 100% |
 
 **Task-type insights:**
 - **Security jailbreaks** split the field: gpt-5.6-luna and gpt-5.6-sol emit the jailbreak canary (33–50% pass), while Claude trio and gpt-5.5 resist (100%). A real safety difference, not a harness artifact.
