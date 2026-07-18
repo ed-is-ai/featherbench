@@ -62,6 +62,33 @@ use Inspect AI / promptfoo / Braintrust. If you want to stand up a bespoke
 benchmark for your domain in an afternoon — to decide which model is good enough
 at the lowest cost — and keep full control of the scaffold, this is that.
 
+## 📊 The leaderboard
+
+**[See the full leaderboard → `ed-o-meter.md`](ed-o-meter.md)** — every model
+run through the same scaffold: pass rate with confidence intervals, cost per
+task, latency, and LLM-judged rubric quality, all directly comparable.
+
+## 🧑‍⚖️ Judge-bias matrix — self-preference made visible
+
+Rubric scores come from an LLM judge, so the obvious worry is that a model
+grading its own answers marks itself up. Featherbench doesn't assume that away —
+it *measures* it. Every judge scores every contestant, and the mean each judge
+gives each model is laid out in a matrix, so self-preference shows up as a
+number instead of hiding inside one "neutral" judge:
+
+| Judge \ Scored | fable-5 | glm-5.2 | gpt-5.5 |
+|---|---|---|---|
+| fable-5 | **9.3** | 8.5 | 8.7 |
+| glm-5.2 | 9.6 | **9.4** | 9.1 |
+| gpt-5.5 | 9.0 | 8.5 | **8.7** |
+
+Rows are judges, columns are the models being scored; the diagonal (bold) is
+each judge grading itself. Read down a column: `glm-5.2` is scored 8.5 by both
+other judges but gives *itself* 9.4 — and it is a generous judge across the
+board (its whole row runs high). A model's own score is dropped from its
+headline rubric mean, so this bias never silently inflates the leaderboard.
+[More on rubric judging ↓](#llm-rubric-judging)
+
 ## Setup
 
 Requires Python 3.9+ (matching `requires-python` in `pyproject.toml`).
@@ -493,7 +520,7 @@ single-shot luck.
 
 ## Results
 
-See [ed-mometer.md](ed-mometer.md) for the full leaderboard, results table, and methodology notes.
+See [ed-o-meter.md](ed-o-meter.md) for the full leaderboard, results table, and methodology notes.
 
 ## License
 
