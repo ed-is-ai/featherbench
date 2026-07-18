@@ -57,10 +57,15 @@ without prejudice, and without having to sign up for numerous accounts.
   apples and the quality-vs-cost tradeoff is a fair read, not an artifact of
   different harnesses.
 
+An eval you can read is an eval you can trust. The harness is ~1,150 lines of
+plain Python — you can verify it: check that it ran the same prompt, the same
+checkers, and the same cost maths.
+
 If you want a heavyweight platform with a UI, tracing, and dataset versioning,
 use Inspect AI / promptfoo / Braintrust. If you want to stand up a bespoke
 benchmark for your domain in an afternoon — to decide which model is good enough
-at the lowest cost — and keep full control of the scaffold, this is that.
+at the lowest cost — and keep full control of a scaffold you can actually audit,
+this is that.
 
 ## 📊 The leaderboard
 
