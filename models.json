@@ -175,7 +175,7 @@
     "sampling": {"temperature": 0.0, "top_p": 1.0}
   },
   "mistral-medium-3.5": {
-    "enabled": true,
+    "enabled": false,
     "model": "mistralai/mistral-medium-3-5",
     "provider_order": ["mistral"],
     "effort": "high",
