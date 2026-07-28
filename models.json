@@ -179,7 +179,7 @@
     "model": "mistralai/mistral-medium-3-5",
     "provider_order": ["mistral"],
     "effort": "high",
-    "max_tokens": 32000
+    "max_tokens": 64000
   },
   "grok-4.5": {
     "enabled": true,
