@@ -882,7 +882,16 @@ class TestConfigContract(unittest.TestCase):
                     "glm-5.2": ("z-ai/glm-5.2", ["z-ai/fp8"]),
                     "gpt-5.6-luna": ("openai/gpt-5.6-luna", ["openai"]),
                     "gpt-5.6-terra": ("openai/gpt-5.6-terra", ["openai"]),
-                    "gpt-5.6-sol": ("openai/gpt-5.6-sol", ["openai"])}
+                    "gpt-5.6-sol": ("openai/gpt-5.6-sol", ["openai"]),
+                    "opus-5": ("anthropic/claude-opus-5", ["anthropic"]),
+                    "gemini-3.6-flash": ("google/gemini-3.6-flash",
+                                         ["google-vertex/global"]),
+                    "grok-4.5": ("x-ai/grok-4.5", ["xai"])}
+        # mistral-medium-3.5 was enabled by 06-01 and dropped from the Phase 06
+        # panel mid-run (operator decision): its effort:"high" verbosity made it
+        # ~10x the wall-clock and ~15x the cost forecast of its peers. The catalog
+        # entry and its corrected 64000 cap remain; it is back to enabled:false, so
+        # it is no longer in this pinned set. Re-add this row when it is re-enabled.
         # ACCEPTED RISK (D-02): this is a subset check, not an exact-set check, so
         # enabling a model no longer turns the suite red. It therefore CANNOT catch
         # an accidentally-enabled model or a silently-dropped one. The README's
@@ -917,6 +926,50 @@ class TestConfigContract(unittest.TestCase):
         for p in ("temperature", "top_p"):
             self.assertIn(p, kwargs)
         self.assertNotIn("seed", kwargs)
+
+    def test_opus_5_sends_no_sampling(self):
+        # Live evidence (06-01): anthropic/claude-opus-5's pinned `anthropic`
+        # endpoint advertises none of seed/temperature/top_p, so all three are
+        # deliberately omitted — the fable-5 / sonnet-5 shape (Pitfall 6).
+        kwargs, _, sent = harness.build_request(self.enabled["opus-5"], "p", None)
+        self.assertEqual(sent, {})
+        for p in self.SAMPLING_PARAMS:
+            self.assertNotIn(p, kwargs)
+
+    def test_gemini_flash_sends_seed_only(self):
+        # Live evidence (06-01): google/gemini-3.6-flash's pinned
+        # `google-vertex/global` endpoint advertises `seed` but NOT temperature
+        # or top_p (the google-ai-studio endpoints do — the Vertex ones do not),
+        # so seed carries determinism and the other two are omitted.
+        kwargs, _, sent = harness.build_request(
+            self.enabled["gemini-3.6-flash"], "p", None)
+        self.assertEqual(sent, {"seed": 7})
+        self.assertNotIn("temperature", kwargs)
+        self.assertNotIn("top_p", kwargs)
+
+    def test_grok_sends_seed_only(self):
+        # Live evidence (06-01): x-ai/grok-4.5's pinned `xai` endpoint advertises
+        # seed, temperature AND top_p. seed alone is sent — the gpt-5.5 sibling
+        # convention: where a provider honours seed, it is the determinism lever
+        # and temperature/top_p stay off the wire.
+        kwargs, _, sent = harness.build_request(self.enabled["grok-4.5"], "p", None)
+        self.assertEqual(sent, {"seed": 7})
+        self.assertNotIn("temperature", kwargs)
+        self.assertNotIn("top_p", kwargs)
+
+    def test_mistral_medium_sends_no_sampling(self):
+        # Live evidence (06-01): mistralai/mistral-medium-3-5's pinned `mistral`
+        # endpoint does advertise seed/temperature/top_p, but this entry pre-dates
+        # the phase and D-04 flips only `enabled` — no sampling is declared, so
+        # none may reach the wire.
+        # Reads from `catalog`, not `enabled`: the entry was set back to
+        # enabled:false when it was dropped from the Phase 06 panel, but its
+        # sampling contract still matters the moment it is re-enabled.
+        kwargs, _, sent = harness.build_request(
+            self.catalog["mistral-medium-3.5"], "p", None)
+        self.assertEqual(sent, {})
+        for p in self.SAMPLING_PARAMS:
+            self.assertNotIn(p, kwargs)
 
     def test_persona_jailbreaks_pass_injections_stay_neutral(self):
         for stem in ("security-jailbreak-aim-machiavelli",
