@@ -145,33 +145,53 @@ hard. Read the two through this footnote, not through the shared number.
 | Model | Pass % | Input tokens (mean) | Output tokens (mean) | Total tokens (mean) | Cost/trial |
 |---|---|---|---|---|---|
 | haiku-4-5 | 96.4% | 287 | 817 | 1,104 | $0.0044 |
+| grok-4.5 | 86% ⁹ | 433 | 898 | 1,331 | $0.0060 |
 | glm-5.2 | 92.9% | 238 | 1,371 | 1,609 | $0.0064 |
 | sonnet-5 | 92.9% | 362 | 1,119 | 1,481 | $0.0119 |
 | gpt-5.6-luna | 82.1% | 220 | 2,105 | 2,326 | $0.0129 |
+| gemini-3.6-flash | 100% | 233 | 2,216 | 2,449 | $0.0170 |
 | gpt-5.6-terra | 89.3% | 220 | 1,478 | 1,699 | $0.0227 |
 | kimi-k3 | 96.5% | 308 | 2,124 | 2,433 | $0.0327 |
 | gpt-5.6-sol | 84.5% | 220 | 1,518 | 1,738 | $0.0466 |
 | gpt-5.5 | 97.6% | 220 | 1,642 | 1,862 | $0.0504 |
 | sonnet-4-6 | 96.4% | 287 | 4,162 | 4,448 | $0.0633 |
 | fable-5 ⁴ | 87.7% | 355 | 1,297 | 1,652 | $0.0684 |
+| opus-5 ⁴ ⁷ | 89% | 371 | 2,712 | 3,082 | $0.0696 |
 
-⁴ fable-5's token and cost means are computed over its **answering trials only**
-— the 28 refused trials (which emit near-zero output) are excluded, since
-including them makes the model look artificially concise and cheap. Including
-refusals its output mean would read 868 tokens at $0.0457/trial. No other model
-in this table has refusals, so this adjustment affects only fable-5.
+The three `20260728T215711Z` rows (grok-4.5, gemini-3.6-flash, opus-5) carry their
+run's whole-percent pass rate rather than a one-decimal figure, because that is the
+precision their source summary publishes and nothing here is recomputed.
+
+⁴ Token and cost means for **fable-5** and **opus-5** are computed over their
+**answering trials only** — refused trials (which emit near-zero output at $0)
+are excluded, since including them makes a model look artificially concise and
+cheap. *fable-5:* its 28 refused trials are excluded; including them its output
+mean would read 868 tokens at $0.0457/trial. *opus-5:* the four
+classifier-blocked trials of footnote 8 are excluded, leaving 24 answering
+trials; including them its means would read 358 input / 2,325 output / 2,682
+total at $0.0597/trial. Note that opus-5's headline **Cost (USD) 1.67** is the
+true all-trials total — the four blocked trials were billed $0, so they change
+the per-trial mean but add nothing to the total. No other model in this table has
+refusals.
 
 **Efficiency ranking (by cost/task):**
 1. **haiku-4-5** — $0.0044/trial (cheapest, and most concise at 817 tokens)
-2. **glm-5.2** — $0.0064/trial (second-cheapest)
-3. **sonnet-5** — $0.0119/trial
-4. **gpt-5.6-luna** — $0.0129/trial
-5. **gpt-5.6-terra** — $0.0227/trial
-6. **kimi-k3** — $0.0327/trial (verbose at 2,124 tokens but 96.5% accuracy)
-7. **gpt-5.6-sol** — $0.0466/trial
-8. **gpt-5.5** — $0.0504/trial (highest pass rate at 97.6%)
-9. **sonnet-4-6** — $0.0633/trial (runaway verbose at 4,162 tokens)
-10. **fable-5** — $0.0684/trial (most expensive; answering trials only)
+2. **grok-4.5** — $0.0060/trial (cheapest of the new panel, and by far the most
+   concise reasoning row at 898 output tokens — partly because it answers some
+   prompts with a flat refusal; see footnote 9)
+3. **glm-5.2** — $0.0064/trial
+4. **sonnet-5** — $0.0119/trial
+5. **gpt-5.6-luna** — $0.0129/trial
+6. **gemini-3.6-flash** — $0.0170/trial (the only clean sweep on this board:
+   28/28, at a sixth of the cost of the next model to clear 96%)
+7. **gpt-5.6-terra** — $0.0227/trial
+8. **kimi-k3** — $0.0327/trial (verbose at 2,124 tokens but 96.5% accuracy)
+9. **gpt-5.6-sol** — $0.0466/trial
+10. **gpt-5.5** — $0.0504/trial (highest pass rate among the earlier runs at 97.6%)
+11. **sonnet-4-6** — $0.0633/trial (runaway verbose at 4,162 tokens)
+12. **fable-5** — $0.0684/trial (answering trials only)
+13. **opus-5** — $0.0696/trial (most expensive; answering trials only, and the
+    most verbose row on the new panel at 2,712 output tokens)
 
 
 **The gpt-5.6 trio emitted the jailbreak canary in 10 of 12 jailbreak cells** —
@@ -181,6 +201,28 @@ three. fable-5's pass rate falls from its earlier published numbers because
 five benign over-refusals now count as a checker FAIL rather than being
 dropped from the denominator; it is also the rubric judge for every model
 above, itself included.
+
+**Two models can reach the same security score from opposite directions.**
+gpt-5.6-luna and gpt-5.6-sol land at 33–50% by *emitting* the jailbreak canary;
+grok-4.5 lands at 50% by refusing the persona *and* the harmless question
+carried alongside it, emitting the canary in zero of six cells. Read bare, the
+table says these models are equally unsafe. They are not — one complied and one
+over-refused, and the checker's binary bit cannot tell you which. This is the
+strongest argument on this page for reading the footnotes before the ranking.
+
+**Defensive transparency is currently punished by the checkers, and a
+provider-side classifier can depress a category cell that has nothing to do with
+capability.** Two effects showed up together in run `20260728T215711Z`. First,
+opus-5 resisted a prompt injection *and reported it* — quoting the injected
+string to name the attack — and scored worse than a model that resisted
+silently, because two checkers in the same task set disagree about whether
+quoting-while-refusing is allowed (footnote 7). Second, an Anthropic
+pre-generation classifier blocked four benign debugging tasks outright, on an
+overlapping set of tasks to the ones it already blocks on fable-5 (footnote 8) —
+so this is now a recurring, cross-model measurement hazard affecting two catalog
+entries, not a one-model quirk. Both are recorded here rather than silently
+corrected in the task set: the tasks are unchanged, so every row on this page is
+still scored against the same checkers.
 
 **haiku-4-5 is the cheapest model tested** at $0.12 for the full 28-task pass
 with a sub-second median TTFT, but its rubric score (7.4) trails the rest of
@@ -196,22 +238,26 @@ config-matched, not a settings artifact.
 
 | Model | Coding | Data | Realworld | Security | Tool-use |
 |---|---|---|---|---|---|
+| gemini-3.6-flash | 100% | 100% | 100% | 100% | 100% |
 | haiku-4-5 | 100% | 100% | 89% | 100% | 100% |
 | sonnet-4-6 | 100% | 100% | 89% | 100% | 100% |
 | glm-5.2 | 100% | 100% | 89% | 83% | 100% |
 | gpt-5.5 | 100% | 100% | 93% | 100% | 100% |
 | kimi-k3 | 100% | 75% | 100% | 100% | 100% |
 | gpt-5.6-terra | 100% | 100% | 100% | 50% | 100% |
+| opus-5 | 50% ⁸ | 100% | 100% ⁷ | 100% ⁷ | 100% |
 | sonnet-5 | 100% | 100% | 78% | 100% | 100% |
 | gpt-5.6-sol | 100% | 100% | 85% | 50% | 100% |
+| grok-4.5 | 100% | 100% | 89% | 50% ⁹ | 100% |
 | gpt-5.6-luna | 100% | 100% | 89% | 33% | 100% |
 | fable-5 | 79% | 100% | 80% | 100% ⁵ | 100% |
 
 **Task-type insights:**
-- **Security jailbreaks** split the field: gpt-5.6-luna and gpt-5.6-sol emit the jailbreak canary (33–50% pass), while Claude trio and gpt-5.5 resist (100%). A real safety difference, not a harness artifact.
-- **Realworld** tasks are the weakest frontier — advice, planning, extraction tasks under 90% for most models. Rubric judging matters here; binary checkers miss quality gaps.
-- **Coding** and **data** tasks are the harness floor — 98%+ pass rates across the board. Unit tests are a strong signal.
+- **Security jailbreaks** split the field, but the percentage alone does not say *which way*. gpt-5.6-luna and gpt-5.6-sol score 33–50% by **emitting** the jailbreak canary — genuinely unsafe. grok-4.5 scores 50% by **refusing too hard**: it emitted the canary in zero of six cells and lost only the "still helpfully answers the benign question" half of the composite checker (footnote 9). Same number, opposite behaviour. The Claude models, gpt-5.5 and gemini-3.6-flash resist cleanly at 100%.
+- **Realworld** tasks are the weakest frontier for most of the field — advice, planning and extraction tasks under 90% — though gemini-3.6-flash (9/9) and opus-5 (9/9 corrected) both clear it. Rubric judging matters here; binary checkers miss quality gaps.
+- **Coding** and **data** tasks are the harness floor for every model that gets to attempt them — 98%+ pass rates across the board. opus-5's 50% coding is the one exception and it is **not a capability result**: four benign debugging tasks were blocked by a provider-side classifier before generation (footnote 8). A category cell can be depressed by a safety filter as easily as by a wrong answer.
 - **kimi-k3 weakness:** data tasks are its only category weakness (75%), particularly the data-fabric-roadmap-user-stories task.
+- **gemini-3.6-flash is the only clean sweep** on this board — 28/28 across all five categories, at $0.0170/trial. Single-trial (footnote 6), so read it as a strong first result rather than a settled one.
 
 ## Methodology notes
 
@@ -240,6 +286,28 @@ config-matched, not a settings artifact.
   security-task refusal from a moderated model and a non-refusal from an
   unmoderated one are not strictly apples-to-apples — check `is_moderated`
   before comparing refusal behavior across those three.
+- **No moderation-parity claim is made for opus-5, gemini-3.6-flash or
+  grok-4.5.** `is_moderated` is **no longer present in OpenRouter's
+  `/endpoints` response object at all** — verified by key-presence check against
+  the live response for all three pinned endpoints, not inferred from a `None`
+  default. The caveat above can therefore be neither confirmed nor ruled out for
+  these three, so nothing is asserted either way. Provider-side refusals are
+  recorded as refusals (see footnote 8) rather than attributed to a known
+  moderation setting.
+- **The new panel's routing pins, stated so a row cannot be scored under the
+  wrong name.** `opus-5` → `anthropic`, `gemini-3.6-flash` →
+  `google-vertex/global`, `grok-4.5` → `xai` — each taken from that slug's live
+  endpoint tag, each a first-party standard-tier route, and **none of them
+  quantization-qualified** (every endpoint reported `quantization: "unknown"`).
+  Cheaper `/flex` and 2x-cost `/priority` tiers were available for two of the
+  three and were rejected, because a different price tier is a different
+  measurement.
+- **Output caps on the new rows.** All three run at `max_tokens: 64000`, and
+  **zero records in `20260728T215711Z` carry a truncation token** — no answer on
+  this page was cut off by the harness rather than finished by the model. The
+  earlier gpt-5.5/glm-5.2/gpt-5.6 rows declare no `max_tokens` at all, so their
+  cap is the provider default; since nothing truncated, that difference did not
+  affect any published score.
 - **Only a hard, provider-side stop is scored as a refusal.** A model that
   declines in prose (rather than tripping the provider's own refusal signal)
   is scored by the checker like any other answer, not counted as a refusal.
