@@ -6,6 +6,13 @@
     "effort": "high",
     "max_tokens": 64000
   },
+  "opus-5": {
+    "enabled": true,
+    "model": "anthropic/claude-opus-5",
+    "provider_order": ["anthropic"],
+    "effort": "high",
+    "max_tokens": 64000
+  },
   "opus-4-8": {
     "enabled": false,
     "model": "anthropic/claude-opus-4.8",
@@ -129,6 +136,14 @@
     "effort": "high",
     "max_tokens": 64000
   },
+  "gemini-3.6-flash": {
+    "enabled": true,
+    "model": "google/gemini-3.6-flash",
+    "provider_order": ["google-vertex/global"],
+    "effort": "high",
+    "max_tokens": 64000,
+    "sampling": {"seed": 7}
+  },
   "deepseek-v4-pro": {
     "enabled": false,
     "model": "deepseek/deepseek-v4-pro",
@@ -160,11 +175,19 @@
     "sampling": {"temperature": 0.0, "top_p": 1.0}
   },
   "mistral-medium-3.5": {
-    "enabled": false,
+    "enabled": true,
     "model": "mistralai/mistral-medium-3-5",
     "provider_order": ["mistral"],
     "effort": "high",
     "max_tokens": 32000
+  },
+  "grok-4.5": {
+    "enabled": true,
+    "model": "x-ai/grok-4.5",
+    "provider_order": ["xai"],
+    "effort": "high",
+    "max_tokens": 64000,
+    "sampling": {"seed": 7}
   },
   "deepseek-v4-flash-or": {
     "enabled": false,
