@@ -1,12 +1,16 @@
 # Featherbench Leaderboard
 
-Published numbers from four source-of-truth runs — one fresh single-trial
-run of the three models with no clean current data, the existing single-trial
-gpt-5.6 trio run, a single-trial reference run of three Claude models not
-in the default panel, and the single-trial rubric-on run `20260728T215711Z`
-of the three newest panel entries (opus-5, gemini-3.6-flash, grok-4.5) —
-hand-collated below (no arithmetic; every cell is copied from its source
-`summary-<ts>.md`):
+Published numbers from four source-of-truth runs, hand-collated below (no
+arithmetic; every cell is copied from its source `summary-<ts>.md`): the
+gpt-5.6 trio run, a reference run of three Claude models outside the default
+panel, a fresh run of the three models with no clean current data, and the
+rubric-on run `20260728T215711Z` of the three newest panel entries (opus-5,
+gemini-3.6-flash, grok-4.5).
+
+**Every row here is single-trial** — one observation per task. The Wilson
+intervals are correspondingly wide and carry no variance information, so read
+them as first results rather than settled ones. No column mixes trial counts.
+Run `--trials 3+` if you need variance.
 
 | Model | Pass rate (95% CI) | Cost (USD) | Median TTFT (s) | Rubric /10 | Default panel |
 |---|---|---|---|---|---|
@@ -51,18 +55,24 @@ Their rubric denominator is **13 tasks, not 14**: the
 recording `{"score": null, "error": "no JSON in judge reply", "cost_usd": 0}` —
 the *judge* was itself blocked pre-generation on that content ($0 billed). The
 hole is identical across all three models, so it biases no comparison between
-them, but the denominator is stated here rather than left implied. ¹ The gpt-5.6 trio and the three
+them, but the denominator is stated here rather than left implied.
+
+¹ The gpt-5.6 trio and the three
 Claude reference models were rubric-off in their source runs; these scores
 were judged retroactively (2026-07-14) by fable-5 against each source run's
 saved answer text, through the harness's own `run_rubric` path
 (`results-20260713T210031Z-rejudged.jsonl`,
 `results-20260714T212403Z-rejudged.jsonl`) — same blind prompt and criteria
-as every other row. ² fable-5's 9.2 is a **self-judged** score — fable-5 is the
+as every other row.
+
+² fable-5's 9.2 is a **self-judged** score — fable-5 is the
 judge scoring its own answers, so unlike every other row (which fable-5 judged
 independently) this cell is self-preference-inflated: the judge-bias matrix in
 its source run shows fable-5 rating itself 9.2 versus 8.6–8.7 for the models it
 judges. It is shown for completeness, not as a like-for-like number, pending an
-independent re-judge. ³ **Recipe-checker false-positive, corrected in-table.**
+independent re-judge.
+
+³ **Recipe-checker false-positive, corrected in-table.**
 `realworld-recipe-veggie-weeknight`'s forbidden-term checker flags a
 non-ingredient mention as if it were an ingredient — an advisory label-check
 caution (fable-5: "some stock cubes, Worcestershire-style sauces … contain
@@ -72,20 +82,10 @@ negation-aware `not_contains` shield added in the harness catches sonnet-5's
 phrasing but not fable-5's or gpt-5.5's, so those two still score FAIL under
 the current checker. All three are genuine false-positives and are counted as
 PASS here: gpt-5.5 93%→96% [82–99] (27/28), sonnet-5 89%→93% [77–98] (26/28),
-fable-5 74%→78% [59–89] (21/27). All pass-rate confidence intervals are
-single-trial Wilson intervals (wider than a multi-trial run would produce) —
-treat them as a first read, not a tight estimate.
+fable-5 74%→78% [59–89] (21/27).
 
-⁶ **Single-trial — stated, not left to be inferred from bracket width.**
-`opus-5`, `gemini-3.6-flash` and `grok-4.5` come from run `20260728T215711Z`,
-executed at `--trials 1` (28 tasks × 3 models × 1 trial). Each bracket is a
-single-trial Wilson interval computed by the harness from passed/scored: it
-summarises **one observation per task** and therefore carries **no multi-trial
-variance information**. It is **not equivalent in confidence** to a multi-trial
-figure and must not be read as one — treat these three rows as a first read, not
-a tight estimate. Every other row on this leaderboard is also single-trial (see
-footnote 3), so no column here is a multi-trial column and no row is being
-compared across differing trial counts; run `--trials 3+` if you need variance.
+⁶ Run `20260728T215711Z` — 28 tasks × 3 models × 1 trial, rubric on. Single-trial
+like every row here (see the note above the first table).
 
 ⁷ **Two checker false-positives on opus-5, corrected in-table** — the same
 treatment as footnote 3, and again with **no task or checker edited**. Published
@@ -257,7 +257,7 @@ config-matched, not a settings artifact.
 - **Realworld** tasks are the weakest frontier for most of the field — advice, planning and extraction tasks under 90% — though gemini-3.6-flash (9/9) and opus-5 (9/9 corrected) both clear it. Rubric judging matters here; binary checkers miss quality gaps.
 - **Coding** and **data** tasks are the harness floor for every model that gets to attempt them — 98%+ pass rates across the board. opus-5's 50% coding is the one exception and it is **not a capability result**: four benign debugging tasks were blocked by a provider-side classifier before generation (footnote 8). A category cell can be depressed by a safety filter as easily as by a wrong answer.
 - **kimi-k3 weakness:** data tasks are its only category weakness (75%), particularly the data-fabric-roadmap-user-stories task.
-- **gemini-3.6-flash is the only clean sweep** on this board — 28/28 across all five categories, at $0.0170/trial. Single-trial (footnote 6), so read it as a strong first result rather than a settled one.
+- **gemini-3.6-flash is the only clean sweep** on this board — 28/28 across all five categories, at $0.0170/trial.
 
 ## Methodology notes
 
