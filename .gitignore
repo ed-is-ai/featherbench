@@ -1,6 +1,8 @@
 .venv/
 __pycache__/
-results/
+results/*
+!results/summary.json
+!results/consolidate.py
 .DS_Store
 build/
 *.egg-info/
