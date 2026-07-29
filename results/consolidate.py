@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
 """Consolidate the source benchmark runs into results/summary.json.
 
-`results/` is gitignored, so this script — not the JSON it writes — is the
-tracked, reproducible artifact. Re-run it after appending a run to SOURCE_RUNS.
+Everything else in `results/` is gitignored; this script and the summary.json it
+writes are the two tracked exceptions (see .gitignore), so the consolidated
+store is both published and reproducible from the raw runs. Re-run after adding
+a run to SOURCE_RUNS — output is byte-stable apart from `generated_utc`.
+
+Run it from anywhere: `python3 results/consolidate.py`.
 
 What it does, in order:
 
@@ -32,8 +36,10 @@ import json
 import os
 import sys
 
-ROOT = os.path.dirname(os.path.abspath(__file__))
-RESULTS = os.path.join(ROOT, "results")
+# This script lives in results/ alongside the runs it consumes, so the repo root
+# is its parent. Every path below is anchored to these two, never to the cwd.
+RESULTS = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(RESULTS)
 OUT = os.path.join(RESULTS, "summary.json")
 
 # One entry per logical run. See rule 1 above before adding to this list.

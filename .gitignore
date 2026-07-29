@@ -2,6 +2,7 @@
 __pycache__/
 results/*
 !results/summary.json
+!results/consolidate.py
 .DS_Store
 build/
 *.egg-info/
