@@ -1,6 +1,7 @@
 .venv/
 __pycache__/
-results/
+results/*
+!results/summary.json
 .DS_Store
 build/
 *.egg-info/
