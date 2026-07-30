@@ -80,9 +80,14 @@ class TestCheckers(unittest.TestCase):
     def test_recipe_task_negation_aware_opt_in(self):
         task = json.loads(
             (harness.TASKS_DIR / "realworld-recipe-veggie-weeknight.json").read_text())
-        nc = [s for s in task["checker"]["checks"] if s.get("type") == "not_contains"]
+        # The check is section-scoped since #36, but negation_aware still applies
+        # inside the scope — and none of the strings below carry an ingredients
+        # heading, so they exercise the whole-text fallback. That is deliberate:
+        # the fallback must stay exactly as strict as the old plain not_contains.
+        nc = [s for s in task["checker"]["checks"]
+              if s.get("type") in ("not_contains", "not_contains_in_section")]
         self.assertEqual(len(nc), 1)
-        self.assertTrue(nc[0].get("negation_aware"), "recipe not_contains must opt in")
+        self.assertTrue(nc[0].get("negation_aware"), "recipe check must opt in")
         spec = nc[0]
         # genuine meat use still FAILS
         self.assertFalse(self.check(spec, "Add 200g pancetta and a splash of Worcestershire.")[0])
@@ -121,8 +126,11 @@ class TestCheckers(unittest.TestCase):
         # regression guard: "anchov" must stay out of the generic not_contains list
         task = json.loads(
             (harness.TASKS_DIR / "realworld-recipe-veggie-weeknight.json").read_text())
-        nc = [s for s in task["checker"]["checks"] if s.get("type") == "not_contains"][0]
-        self.assertNotIn("anchov", nc["values"], "anchov must stay out of the generic not_contains list")
+        nc = [s for s in task["checker"]["checks"]
+              if s.get("type") in ("not_contains", "not_contains_in_section")][0]
+        self.assertNotIn("anchov", nc["values"],
+                         "anchov must stay out of the generic forbidden-term list — it needs the "
+                         "ingredient-vs-label-caution regex, not a bare substring match")
 
     def test_contains_whole_word(self):
         self.assertTrue(self.check({"type": "not_contains", "value": "kill",
@@ -1008,6 +1016,66 @@ class TestConfigContract(unittest.TestCase):
         # so a typo'd "refusal" anywhere fails offline, not mid-run.
         for f in sorted(harness.TASKS_DIR.glob("*.json")):
             harness.refusal_verdict(json.loads(f.read_text()))  # must not raise
+
+
+class TestSectionScopedNotContains(unittest.TestCase):
+    """Scoping the forbidden-term check to the ingredients list removes a whole
+    class of false positive that three prior fixes each addressed one shape of
+    (advisory caution, coordinated negated list, heading-form omission list).
+
+    The invariant: prose may discuss omissions and substitutions freely; the
+    ingredients list itself may not contain the term. An answer with no such
+    section falls back to the whole text, so it is never scored more leniently
+    than before the change.
+    """
+
+    SPEC = {"type": "not_contains_in_section", "section": "ingredients",
+            "negation_aware": True, "values": ["worcestershire", "anchov", "bacon"]}
+
+    def _check(self, text):
+        return harness.run_check(self.SPEC, text, [])[0]
+
+    def test_term_only_in_prose_passes(self):
+        # opus-5's actual shape — the heading-form omission list of issue #36.
+        text = ("## Ingredients\n- 400g chickpeas\n- 2 tbsp olive oil\n\n## Method\n"
+                "1. Fry the onion.\n\n**Deliberately left out:** Worcestershire sauce "
+                "(contains anchovies), pesto and Parmesan (animal rennet). None are needed.")
+        self.assertTrue(self._check(text))
+
+    def test_term_in_the_ingredients_list_still_fails(self):
+        text = ("## Ingredients\n- 400g chickpeas\n- 1 tbsp Worcestershire sauce\n\n"
+                "## Method\n1. Fry the onion.")
+        self.assertFalse(self._check(text))
+
+    def test_advisory_caution_in_prose_passes(self):
+        # fable-5's shape — the original false positive from quick task 260715-cjq.
+        text = ("### Ingredients\n* 200g red lentils\n* 1 vegetable stock cube\n\n"
+                "### Method\n1. Simmer.\n\nNote: some stock cubes and Worcestershire-style "
+                "sauces contain animal products — check the label.")
+        self.assertTrue(self._check(text))
+
+    def test_decorated_headings_are_recognised(self):
+        # glm-5.2 shipped "### **Ingredients**"; bold/underscore decoration must not
+        # defeat section detection, or the check silently falls back to whole-text.
+        for heading in ("## Ingredients", "### **Ingredients**", "**Ingredients**",
+                        "INGREDIENTS:", "_Ingredients_"):
+            text = f"{heading}\n- 400g chickpeas\n\n## Method\n1. Cook. Left out bacon."
+            self.assertTrue(self._check(text), heading)
+
+    def test_missing_section_falls_back_to_whole_text(self):
+        # No ingredients heading: must be no more lenient than plain not_contains.
+        self.assertFalse(self._check("Just fry some bacon and serve."))
+
+    def test_section_ends_at_the_next_heading(self):
+        # A term under Method must not be attributed to the ingredients list.
+        text = "## Ingredients\n- 400g chickpeas\n\n## Method\n1. Add bacon.\n"
+        self.assertTrue(self._check(text))
+
+    def test_shipped_recipe_task_uses_the_scoped_checker(self):
+        task = json.loads((harness.TASKS_DIR /
+                           "realworld-recipe-veggie-weeknight.json").read_text())
+        kinds = {c.get("type") for c in task["checker"]["checks"]}
+        self.assertIn("not_contains_in_section", kinds)
 
 
 class TestResume(unittest.TestCase):
