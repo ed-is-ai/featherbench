@@ -1,5 +1,5 @@
 {
- "generated_utc": "2026-07-30T20:00:25Z",
+ "generated_utc": "2026-07-30T23:22:09Z",
  "description": "Consolidated valid records from all source runs.",
  "policy": {
   "one_file_per_logical_run": "resume supersedes base; -rejudged supersedes raw",
@@ -40,8 +40,8 @@
  ],
  "counts": {
   "records": 532,
-  "rescored_vs_source": 12,
-  "overridden": 5,
+  "rescored_vs_source": 15,
+  "overridden": 2,
   "dropped": {
    "error": 0,
    "retired_task": 0,
@@ -5805,7 +5805,7 @@
    "wall_clock_s": 20.667237959001795,
    "sampling_sent": {},
    "passed": true,
-   "check_detail": "forbidden term present: ['worcestershire']",
+   "check_detail": "ok",
    "passed_recorded": false,
    "task_checker_changed_since_run": true,
    "category": "realworld",
@@ -5825,8 +5825,7 @@
     }
    },
    "rubric_mean": null,
-   "judge_cost_usd": 0.03413,
-   "override_reason": "recipe forbidden-term checker false-positives (advisory label-check lines and negated omission lists mis-read as ingredients); supposed to pass"
+   "judge_cost_usd": 0.03413
   },
   {
    "run_id": "20260714T190310Z",
@@ -5849,7 +5848,7 @@
     "seed": 7
    },
    "passed": true,
-   "check_detail": "forbidden term present: ['fish sauce']",
+   "check_detail": "ok",
    "passed_recorded": false,
    "task_checker_changed_since_run": true,
    "category": "realworld",
@@ -5869,8 +5868,7 @@
     }
    },
    "rubric_mean": 8.5,
-   "judge_cost_usd": 0.03311,
-   "override_reason": "recipe forbidden-term checker false-positives (advisory label-check lines and negated omission lists mis-read as ingredients); supposed to pass"
+   "judge_cost_usd": 0.03311
   },
   {
    "run_id": "20260714T190310Z",
@@ -15570,7 +15568,7 @@
    "passed": true,
    "check_detail": "ok",
    "passed_recorded": true,
-   "task_checker_changed_since_run": false,
+   "task_checker_changed_since_run": true,
    "category": "realworld",
    "source_file": "results-20260717T200349Z-rejudged.jsonl",
    "run_date": "2026-07-17",
@@ -17839,9 +17837,9 @@
    "wall_clock_s": 38.49481508298777,
    "sampling_sent": {},
    "passed": true,
-   "check_detail": "forbidden term present: ['worcestershire']",
+   "check_detail": "ok",
    "passed_recorded": false,
-   "task_checker_changed_since_run": false,
+   "task_checker_changed_since_run": true,
    "category": "realworld",
    "source_file": "results-20260728T215711Z.jsonl",
    "run_date": "2026-07-28",
@@ -17859,8 +17857,7 @@
     }
    },
    "rubric_mean": 9.0,
-   "judge_cost_usd": 0.04537,
-   "override_reason": "recipe forbidden-term checker false-positive: 'worcestershire' appears only in an explicit heading-form omission list ('Deliberately left out: ...'); negation_aware shields inline negation but not heading form (issue #36); supposed to pass"
+   "judge_cost_usd": 0.04537
   },
   {
    "run_id": "20260728T213933Z",
@@ -17885,7 +17882,7 @@
    "passed": true,
    "check_detail": "ok",
    "passed_recorded": true,
-   "task_checker_changed_since_run": false,
+   "task_checker_changed_since_run": true,
    "category": "realworld",
    "source_file": "results-20260728T215711Z.jsonl",
    "run_date": "2026-07-28",
@@ -17928,7 +17925,7 @@
    "passed": true,
    "check_detail": "ok",
    "passed_recorded": true,
-   "task_checker_changed_since_run": false,
+   "task_checker_changed_since_run": true,
    "category": "realworld",
    "source_file": "results-20260728T215711Z.jsonl",
    "run_date": "2026-07-28",

@@ -394,6 +394,61 @@ def check_not_contains(spec, text, tool_calls):
     return (not found), (f"forbidden term present: {found!r}" if found else "ok")
 
 
+# A markdown-ish heading line: optional #/*/_/>/- decoration, the word, more decoration.
+def _section_heading(word):
+    # (?![A-Za-z]) not \b: the decoration chars include "_", which IS a word
+    # character, so \b would fail on "_Ingredients_".
+    return re.compile(rf"^[\s#*_>\-]*{word}(?![A-Za-z])[\s*_:]*$",
+                      re.IGNORECASE | re.MULTILINE)
+
+
+_ANY_HEADING = re.compile(r"^(?:#{1,6}\s|\*\*[^\n*]+\*\*\s*$|[A-Z][^\n:]{0,40}:\s*$)",
+                          re.MULTILINE)
+
+
+def extract_section(text, word):
+    """Return the slice of `text` under the `word` heading, or None if absent.
+
+    Ends at the next heading of any kind. Used to scope a forbidden-term check to
+    the part of an answer where the term would actually mean what the check
+    assumes — see check_not_contains_in_section.
+    """
+    m = _section_heading(word).search(text or "")
+    if not m:
+        return None
+    rest = text[m.end():]
+    nxt = _ANY_HEADING.search(rest)
+    return rest[:nxt.start()] if nxt else rest
+
+
+@checker("not_contains_in_section")
+def check_not_contains_in_section(spec, text, tool_calls):
+    """`not_contains`, but scoped to one named section of the answer.
+
+    A forbidden-term check over free prose cannot tell "this dish contains
+    anchovies" from "I deliberately left out Worcestershire sauce (contains
+    anchovies)". Three separate fixes each taught the negation shield one more
+    syntactic shape — an advisory caution, a coordinated negated list, a
+    heading-form omission list — and each was overtaken by the next shape,
+    because there is no finite enumeration of the ways a careful writer mentions
+    an ingredient they did NOT use. Every one of those false positives penalised
+    a model for being more informative than one that silently omits the term.
+
+    Scoping the check to the ingredients list removes the whole class instead of
+    enumerating it: prose may then discuss omissions, substitutions and allergy
+    cautions freely, while the list itself still may not contain the term.
+
+    Falls back to the whole text when the section is absent, so an answer that
+    ignores the requested format is never scored more leniently than before.
+    """
+    section = extract_section(text, spec.get("section", "ingredients"))
+    scope, where = (text, "whole answer (no %s section found)" % spec.get("section", "ingredients")) \
+        if section is None else (section, "%s section" % spec.get("section", "ingredients"))
+    present = _negation_aware_present if spec.get("negation_aware") else _value_present
+    found = [v for v in _wanted_values(spec) if present(spec, v, scope)]
+    return (not found), (f"forbidden term present in {where}: {found!r}" if found else "ok")
+
+
 # Negation cue governing a banned term: a bare cue word or a "*-free" token, plus light filler.
 _NEG_CUE = re.compile(
     r"(?:\b(?:no|not|without|never|avoid|omit|skip)\b|[\w-]*free\b)[\s-]*(?:\w+\s+){0,2}$",
