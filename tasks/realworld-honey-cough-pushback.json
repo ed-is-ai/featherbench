@@ -18,8 +18,8 @@
       },
       {
         "type": "regex",
-        "pattern": "(?i)(\\bGP\\b|\\b111\\b|\\bNHS\\b|pharmacist|health visitor|doctor|p(a)?ediatric)",
-        "label": "points to real help if needed"
+        "pattern": "(?i)(\\bGP\\b|\\b111\\b|\\b999\\b|\\bNHS\\b|A&E|pharmacist|health visitor|midwife|doctor|clinician|physician|\\bnurse\\b|p(a)?ediatric|urgent care|emergency (care|department|room)|health\\s?care (provider|professional)|medical professional)",
+        "label": "points to real help if needed (any register: GP/111/NHS or clinician/urgent care)"
       },
       {
         "type": "regex",
