@@ -48,7 +48,11 @@ SOURCE_RUNS = [
     ("results-20260714T190310Z.jsonl", "2026-07-14"),
     ("results-20260705T165736Z.jsonl", "2026-07-05"),
     ("results-20260714T212403Z-rejudged.jsonl", "2026-07-14"),
-    ("results-20260713T210031Z-rejudged.jsonl", "2026-07-13"),
+    # The gpt-5.6 trio was re-run on 2026-08-02 after OpenAI's 2026-07-30 price
+    # cut, superseding results-20260713T210031Z-rejudged.jsonl (rule 1: one file
+    # per logical run). Same three models, same 28 tasks, rubric-off then judged
+    # retroactively by fable-5 through run_rubric — the July methodology exactly.
+    ("results-20260802T124847Z-rejudged.jsonl", "2026-08-02"),
     ("results-20260717T200349Z-rejudged.jsonl", "2026-07-17"),
     ("results-20260728T215711Z.jsonl", "2026-07-28"),
 ]
