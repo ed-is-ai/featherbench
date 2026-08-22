@@ -887,14 +887,16 @@ class TestConfigContract(unittest.TestCase):
     def test_enabled_models_pin_slugs_and_provider_order(self):
         expected = {"fable-5": ("anthropic/claude-fable-5", ["anthropic"]),
                     "gpt-5.5": ("openai/gpt-5.5", ["openai"]),
-                    "glm-5.2": ("z-ai/glm-5.2", ["z-ai/fp8"]),
+                    "glm-5.3": ("z-ai/glm-5.3", ["z-ai/fp8"]),
                     "gpt-5.6-luna": ("openai/gpt-5.6-luna", ["openai"]),
                     "gpt-5.6-terra": ("openai/gpt-5.6-terra", ["openai"]),
                     "gpt-5.6-sol": ("openai/gpt-5.6-sol", ["openai"]),
                     "opus-5": ("anthropic/claude-opus-5", ["anthropic"]),
-                    "gemini-3.6-flash": ("google/gemini-3.6-flash",
+                    "gemini-3.7-flash": ("google/gemini-3.7-flash",
                                          ["google-vertex/global"]),
-                    "grok-4.5": ("x-ai/grok-4.5", ["xai"])}
+                    "deepseek-v4-pro": ("deepseek/deepseek-v4-pro",
+                                         ["streamlake/fp8"]),
+                    "grok-4.6": ("x-ai/grok-4.6", ["xai"])}
         # mistral-medium-3.5 was enabled by 06-01 and dropped from the Phase 06
         # panel mid-run (operator decision): its effort:"high" verbosity made it
         # ~10x the wall-clock and ~15x the cost forecast of its peers. The catalog
@@ -929,7 +931,7 @@ class TestConfigContract(unittest.TestCase):
         # `seed` would filter the endpoint out and 404 the trial (Pitfall 6,
         # Open Q2 — resolved by the 01-04 live smoke). temperature:0.0 carries
         # determinism instead.
-        kwargs, _, sent = harness.build_request(self.enabled["glm-5.2"], "p", None)
+        kwargs, _, sent = harness.build_request(self.enabled["glm-5.3"], "p", None)
         self.assertEqual(set(sent), {"temperature", "top_p"})
         for p in ("temperature", "top_p"):
             self.assertIn(p, kwargs)
@@ -945,22 +947,22 @@ class TestConfigContract(unittest.TestCase):
             self.assertNotIn(p, kwargs)
 
     def test_gemini_flash_sends_seed_only(self):
-        # Live evidence (06-01): google/gemini-3.6-flash's pinned
+        # Live evidence (08-22): google/gemini-3.7-flash's pinned
         # `google-vertex/global` endpoint advertises `seed` but NOT temperature
         # or top_p (the google-ai-studio endpoints do — the Vertex ones do not),
         # so seed carries determinism and the other two are omitted.
         kwargs, _, sent = harness.build_request(
-            self.enabled["gemini-3.6-flash"], "p", None)
+            self.enabled["gemini-3.7-flash"], "p", None)
         self.assertEqual(sent, {"seed": 7})
         self.assertNotIn("temperature", kwargs)
         self.assertNotIn("top_p", kwargs)
 
     def test_grok_sends_seed_only(self):
-        # Live evidence (06-01): x-ai/grok-4.5's pinned `xai` endpoint advertises
+        # Live evidence (08-22): x-ai/grok-4.6's pinned `xai` endpoint advertises
         # seed, temperature AND top_p. seed alone is sent — the gpt-5.5 sibling
         # convention: where a provider honours seed, it is the determinism lever
         # and temperature/top_p stay off the wire.
-        kwargs, _, sent = harness.build_request(self.enabled["grok-4.5"], "p", None)
+        kwargs, _, sent = harness.build_request(self.enabled["grok-4.6"], "p", None)
         self.assertEqual(sent, {"seed": 7})
         self.assertNotIn("temperature", kwargs)
         self.assertNotIn("top_p", kwargs)

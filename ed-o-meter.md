@@ -1,11 +1,11 @@
 # Featherbench Leaderboard
 
-Published numbers from five source-of-truth runs, hand-collated below: the
+Published numbers from six source-of-truth runs, hand-collated below: the
 gpt-5.6 trio run `20260802T124847Z`, a reference run of three Claude models
 outside the default panel, a fresh run of the three models with no clean current
 data, and the rubric-on run `20260728T215711Z` of the three newest panel entries
-(opus-5, gemini-3.6-flash, grok-4.5), plus the rubric-on replacement-model run
-`20260822T172041Z` (glm-5.3, gemini-3.7-flash, grok-4.6, deepseek-v4-pro).
+(opus-5, gemini-3.6-flash, grok-4.5), plus the replacement-model runs
+`20260822T172041Z` (rubric-on scores) and `20260822T184533Z` (latest TTFTs).
 
 Every cell is copied from its source `summary-<ts>.md` **except the three
 gpt-5.6 Cost cells**, which are stated at list price rather than as billed —
@@ -18,15 +18,15 @@ Run `--trials 3+` if you need variance.
 
 | Model | Pass rate (95% CI) | Cost (USD) | Median TTFT (s) | Rubric /10 | Default panel |
 |---|---|---|---|---|---|
-| glm-5.3 | 100% [88–100] | 0.28 | 16.3 | 9.3 | Yes |
-| deepseek-v4-pro | 96% [82–99] ¹⁶ | 0.08 | 40.0 | 8.7 | Yes |
-| grok-4.6 | 96% [82–99] ¹⁷ | 0.34 | 14.6 | 8.8 | Yes |
+| glm-5.3 | 100% [88–100] | 0.28 | 27.5 | 9.3 | Yes |
+| deepseek-v4-pro | 96% [82–99] ¹⁶ | 0.08 | 39.1 | 8.7 | Yes |
+| grok-4.6 | 96% [82–99] ¹⁷ | 0.34 | 13.6 | 8.8 | Yes |
 | haiku-4-5 | 96% [82–99] | 0.12 | 0.9 | 7.4 ¹ | No |
 | sonnet-4-6 | 96% [82–99] | 1.84 | 7.5 | 8.9 ¹ | No |
 | gpt-5.5 | 96% [82–99] ³ | 1.43 | 13.2 | 8.7 | Yes |
 | grok-4.5 | 96% [82–99] ⁶ ⁹ | 0.17 | 4.6 | 7.7 | No |
 | kimi-k3 | 96% [82–99] ¹² | 0.93 ¹² | 26.4 | 9.5 | No |
-| gemini-3.7-flash | 93% [77–98] ¹⁸ | 0.11 | 9.7 | 8.8 | Yes |
+| gemini-3.7-flash | 93% [77–98] ¹⁸ | 0.11 | 8.5 | 8.8 | Yes |
 | sonnet-5 | 93% [77–98] ³ | 0.33 | 1.8 | 8.8 ¹ | No |
 | glm-5.2 | 89% [73–96] ¹¹ | 0.18 | 13.1 | 8.6 | No |
 | opus-5 | 89% [72–96] ⁶ ⁷ ⁸ | 1.67 | 8.3 | 9.4 | Yes |
@@ -41,16 +41,16 @@ Run `--trials 3+` if you need variance.
 |---|---|---|---|---|---|
 | kimi-k3 | 9.5 | 96% [82–99] ¹² | 0.93 ¹² | 26.4 | No |
 | opus-5 | 9.4 | 89% [72–96] ⁶ ⁷ ⁸ | 1.67 | 8.3 | Yes |
-| glm-5.3 | 9.3 | 100% [88–100] | 0.28 | 16.3 | Yes |
+| glm-5.3 | 9.3 | 100% [88–100] | 0.28 | 27.5 | Yes |
 | fable-5 | 9.2 ² | 78% [59–89] ³ | 1.35 | 7.9 | Yes |
 | sonnet-4-6 | 8.9 ¹ | 96% [82–99] | 1.84 | 7.5 | No |
 | sonnet-5 | 8.8 ¹ | 93% [77–98] ³ | 0.33 | 1.8 | No |
 | gpt-5.6-sol | 8.8 ¹⁴ | 86% [69–94] ¹⁴ | 1.45 ¹³ | 6.8 | Yes |
-| gemini-3.7-flash | 8.8 | 93% [77–98] ¹⁸ | 0.11 | 9.7 | Yes |
-| grok-4.6 | 8.8 | 96% [82–99] ¹⁷ | 0.34 | 14.6 | Yes |
+| gemini-3.7-flash | 8.8 | 93% [77–98] ¹⁸ | 0.11 | 8.5 | Yes |
+| grok-4.6 | 8.8 | 96% [82–99] ¹⁷ | 0.34 | 13.6 | Yes |
 | gemini-3.6-flash | 8.8 | 96% [82–99] ⁶ ¹⁰ | 0.48 | 6.6 | No |
 | gpt-5.5 | 8.7 | 96% [82–99] ³ | 1.43 | 13.2 | Yes |
-| deepseek-v4-pro | 8.7 | 96% [82–99] ¹⁶ | 0.08 | 40.0 | Yes |
+| deepseek-v4-pro | 8.7 | 96% [82–99] ¹⁶ | 0.08 | 39.1 | Yes |
 | gpt-5.6-terra | 8.7 ¹⁴ | 86% [69–94] ¹⁴ | 0.49 ¹³ | 4.8 | Yes |
 | glm-5.2 | 8.6 | 89% [73–96] ¹¹ | 0.18 | 13.1 | No |
 | gpt-5.6-luna | 8.6 ¹⁴ | 79% [60–90] ¹⁴ ¹⁵ | 0.06 ¹³ | 5.3 | Yes |
@@ -449,7 +449,7 @@ refusals.
    2026-07-30 price cut, but among the least accurate rows at 79% — cheap per
    trial is not cheap per *correct* answer)
 2. **deepseek-v4-pro** — $0.0029/trial (the low price comes with a very long
-   3,461-token mean output and 40.0 s median TTFT)
+   3,461-token mean output and 39.1 s median TTFT)
 3. **gemini-3.7-flash** — $0.0038/trial
 4. **haiku-4-5** — $0.0044/trial (cheapest of the unrepriced rows, and most
    concise at 817 tokens)
@@ -511,7 +511,7 @@ corrected in the task set: the tasks are unchanged, so every row on this page is
 still scored against the same checkers.
 
 **deepseek-v4-pro is the lowest-cost full 28-task run** at $0.08, but it is
-also the least responsive new row at 40.0 s median TTFT and averages 3,461
+also the least responsive new row at 39.1 s median TTFT and averages 3,461
 output tokens. That $0.08 is also not a like-for-like price: deepseek-v4-pro is
 served over `streamlake/fp8`, one of the two quantization-qualified routes on
 the current default panel (see the routing-pins note below).
