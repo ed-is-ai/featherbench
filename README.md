@@ -508,9 +508,20 @@ single-shot luck.
 ## Results
 
 See [ed-o-meter.md](ed-o-meter.md) for the full leaderboard, results table, and methodology notes.
-The machine-readable aggregate is [`results/summary.json`](results/summary.json);
-its agent-readable [Open Knowledge Format bundle](okf/index.md) documents the
-data contract, metrics, provenance, and current replacement-model run.
+
+### Agent-readable results (OKF)
+
+[`results/summary.json`](results/summary.json) is the machine-readable aggregate:
+one re-scored record for every valid model/task/trial from the published source
+runs. For agents and data-catalog tools, the same context is also available as
+an [Open Knowledge Format (OKF)](okf/index.md) bundle — Google Cloud's plain
+Markdown-and-YAML format for portable knowledge.
+
+The bundle does not duplicate or replace the raw JSON. It makes the data easier
+to discover and interpret, with linked concepts for the trial-record schema,
+pass-rate and TTFT metrics, the consolidation policy, and the current
+replacement-model run. Start at [`okf/index.md`](okf/index.md); each concept is
+readable on its own and links back to the underlying source data.
 
 ## License
 
