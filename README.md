@@ -508,6 +508,9 @@ single-shot luck.
 ## Results
 
 See [ed-o-meter.md](ed-o-meter.md) for the full leaderboard, results table, and methodology notes.
+The machine-readable aggregate is [`results/summary.json`](results/summary.json);
+its agent-readable [Open Knowledge Format bundle](okf/index.md) documents the
+data contract, metrics, provenance, and current replacement-model run.
 
 ## License
 
