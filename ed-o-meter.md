@@ -11,6 +11,11 @@ Every cell is copied from its source `summary-<ts>.md` **except the three
 gpt-5.6 Cost cells**, which are stated at list price rather than as billed —
 see footnote 13, which gives both figures.
 
+The full machine-readable benchmark record is available as
+[`results/summary.json`](results/summary.json), with an agent-readable
+[Open Knowledge Format bundle](okf/index.md) covering the schema, metrics,
+provenance, and source runs.
+
 **Every row here is single-trial** — one observation per task. The Wilson
 intervals are correspondingly wide and carry no variance information, so read
 them as first results rather than settled ones. No column mixes trial counts.
