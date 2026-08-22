@@ -124,8 +124,14 @@
     "provider_order": ["openai"]
   },
   "glm-5.2": {
-    "enabled": true,
+    "enabled": false,
     "model": "z-ai/glm-5.2",
+    "provider_order": ["z-ai/fp8"],
+    "sampling": {"temperature": 0.0, "top_p": 1.0}
+  },
+  "glm-5.3": {
+    "enabled": true,
+    "model": "z-ai/glm-5.3",
     "provider_order": ["z-ai/fp8"],
     "sampling": {"temperature": 0.0, "top_p": 1.0}
   },
@@ -137,17 +143,27 @@
     "max_tokens": 64000
   },
   "gemini-3.6-flash": {
-    "enabled": true,
+    "enabled": false,
     "model": "google/gemini-3.6-flash",
     "provider_order": ["google-vertex/global"],
     "effort": "high",
     "max_tokens": 64000,
     "sampling": {"seed": 7}
   },
+  "gemini-3.7-flash": {
+    "enabled": true,
+    "model": "google/gemini-3.7-flash",
+    "provider_order": ["google-vertex/global"],
+    "effort": "high",
+    "max_tokens": 64000,
+    "sampling": {"seed": 7}
+  },
   "deepseek-v4-pro": {
-    "enabled": false,
+    "enabled": true,
     "model": "deepseek/deepseek-v4-pro",
-    "provider_order": ["deepseek"],
+    "provider_order": ["streamlake/fp8"],
+    "effort": "max",
+    "max_tokens": 64000,
     "sampling": {"temperature": 0.0, "top_p": 1.0}
   },
   "deepseek-v4-flash": {
@@ -182,8 +198,16 @@
     "max_tokens": 64000
   },
   "grok-4.5": {
-    "enabled": true,
+    "enabled": false,
     "model": "x-ai/grok-4.5",
+    "provider_order": ["xai"],
+    "effort": "high",
+    "max_tokens": 64000,
+    "sampling": {"seed": 7}
+  },
+  "grok-4.6": {
+    "enabled": true,
+    "model": "x-ai/grok-4.6",
     "provider_order": ["xai"],
     "effort": "high",
     "max_tokens": 64000,
