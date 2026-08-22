@@ -109,8 +109,8 @@ on disk. The client picks it up when a model is called
 ### Models
 
 [`models.json`](models.json) is a catalog of selectable models, each keyed by a
-short handle (`fable-5`, `opus-5`, `gpt-5.5`, `glm-5.2`, `gpt-5.6-luna`,
-`gpt-5.6-terra`, `gpt-5.6-sol`, `gemini-3.6-flash`, `grok-4.5`, `haiku-4-5`,
+short handle (`fable-5`, `opus-5`, `gpt-5.5`, `glm-5.3`, `gpt-5.6-luna`,
+`gpt-5.6-terra`, `gpt-5.6-sol`, `gemini-3.7-flash`, `grok-4.6`, `haiku-4-5`,
 `sonnet-4-6`, `sonnet-5`, …) and carrying a flat
 **OpenRouter slug** plus its per-request routing and sampling config. A typical
 entry:
@@ -126,7 +126,7 @@ entry:
 ```
 
 - **`model`** is the OpenRouter slug (`anthropic/claude-fable-5`,
-  `openai/gpt-5.5`, `z-ai/glm-5.2`, `x-ai/grok-4.5`).
+  `openai/gpt-5.5`, `z-ai/glm-5.3`, `x-ai/grok-4.6`).
 - **`provider_order`** pins routing to the labelled upstream (e.g. `["z-ai/fp8"]`
   for GLM's first-party fp8 endpoint) — combined with `allow_fallbacks:false`
   and `require_parameters:true`, a run never scores a silent fallback or a
@@ -140,9 +140,9 @@ entry:
 Selection:
 
 - **`enabled: true`** marks the default set — a bare `eval.py` run uses only
-  those. Out of the box that is **nine** models: `fable-5`, `opus-5`, `gpt-5.5`,
-  `gpt-5.6-luna`, `gpt-5.6-terra`, `gpt-5.6-sol`, `glm-5.2`,
-  `gemini-3.6-flash`, `grok-4.5` — so budget a bare run for nine models, not
+  those. Out of the box that is **ten** models: `fable-5`, `opus-5`, `gpt-5.5`,
+  `gpt-5.6-luna`, `gpt-5.6-terra`, `gpt-5.6-sol`, `glm-5.3`,
+  `gemini-3.7-flash`, `grok-4.6`, `deepseek-v4-pro` — so budget a bare run for ten models, not
   the six it shipped with. Flip the flag to change the default panel.
 - **`--models a,b`** runs exactly those keys, even if disabled (an unknown key
   errors with the list of valid ones).
@@ -152,7 +152,7 @@ Cost comes straight from OpenRouter's per-response `usage.cost`, so the Cost
 (USD) column populates for **every** model with no price table to maintain.
 Before a real run, check each slug against
 [OpenRouter's model list](https://openrouter.ai/models) and adjust the exact IDs
-(`openai/gpt-5.5`, `z-ai/glm-5.2`, …) to what your account can route to.
+(`openai/gpt-5.5`, `z-ai/glm-5.3`, …) to what your account can route to.
 
 ## ⚠️ Run this on a sandboxed machine
 
