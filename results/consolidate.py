@@ -55,6 +55,10 @@ SOURCE_RUNS = [
     ("results-20260802T124847Z-rejudged.jsonl", "2026-08-02"),
     ("results-20260717T200349Z-rejudged.jsonl", "2026-07-17"),
     ("results-20260728T215711Z.jsonl", "2026-07-28"),
+    # Replacement panel's complete rubric-on run. The later serial no-rubric
+    # TTFT probe is intentionally not a second aggregate source: it is a
+    # repeat measurement with one provider error and no rubric records.
+    ("results-20260822T172041Z.jsonl", "2026-08-22"),
 ]
 
 RETIRED_TASKS = set()
