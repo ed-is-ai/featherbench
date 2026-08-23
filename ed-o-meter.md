@@ -269,6 +269,12 @@ list for those two and identical to it for sol. The promotion is temporary, so
 billing it as the published figure would date the board the moment it ends; list
 price is the durable comparison. `results/summary.json` and the source run both
 carry the charged value, so the divergence is auditable.
+The promotion has since ended. Re-checked live on 2026-08-22 against
+`openrouter.ai/openai/gpt-5.6-luna` and `openrouter.ai/openai/gpt-5.6-terra`:
+both pages carry standard list rates only — luna $0.20 / $1.20 and terra
+$2.00 / $12.00 per M in–out — and name no promotion, discount or temporary
+price anywhere. Billed and list have converged, so these cells now match what
+a run today would be charged.
 
 This was measured, not read off a price page: dividing each model's recorded
 `cost_usd` by its recorded token counts over nine calls with different
