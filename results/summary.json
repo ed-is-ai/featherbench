@@ -1,5 +1,5 @@
 {
- "generated_utc": "2026-08-29T19:45:58Z",
+ "generated_utc": "2026-08-29T20:02:50Z",
  "description": "Consolidated valid records from all source runs.",
  "policy": {
   "one_file_per_logical_run": "resume supersedes base; -rejudged supersedes raw",
