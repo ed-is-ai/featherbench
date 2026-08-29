@@ -59,6 +59,14 @@ SOURCE_RUNS = [
     # TTFT probe is intentionally not a second aggregate source: it is a
     # repeat measurement with one provider error and no rubric records.
     ("results-20260822T172041Z.jsonl", "2026-08-22"),
+    # glm-5.3-flash's first run, 28 tasks, rubric-on (fable-5 judge) — the same
+    # methodology as the replacement panel above. Run with effort:high (added to
+    # the glm-5.3 line the same day). cost_usd in the raw JSONL was recorded
+    # while OpenRouter's 50% launch promo was active ($0.075/$0.25 per 1M vs the
+    # $0.15/$0.50 list rate); every record's cost_usd has been doubled in place
+    # to the list rate so cross-model cost stays honest once the promo ends
+    # (2026-09-09) — same correction as gpt-5.6-luna in c962bd6.
+    ("results-20260829T185048Z.jsonl", "2026-08-29"),
 ]
 
 RETIRED_TASKS = set()
