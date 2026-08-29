@@ -525,7 +525,7 @@ readable on its own and links back to the underlying source data.
 
 ## Acknowledgements
 
-Developed with support from [Reinvently](https://reinvently.co.uk/) — independent
+Developed by [Reinvently](https://reinvently.co.uk/) — independent
 AI research for UK technology leaders.
 
 ## License
