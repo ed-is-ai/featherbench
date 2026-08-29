@@ -135,6 +135,12 @@
     "provider_order": ["z-ai/fp8"],
     "sampling": {"temperature": 0.0, "top_p": 1.0}
   },
+  "glm-5.3-flash": {
+    "enabled": true,
+    "model": "z-ai/glm-5.3-flash",
+    "provider_order": ["z-ai/fp8"],
+    "sampling": {"temperature": 0.0, "top_p": 1.0}
+  },
   "gemini-3-pro": {
     "enabled": false,
     "model": "google/gemini-3-pro-preview",
