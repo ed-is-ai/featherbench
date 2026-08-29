@@ -523,6 +523,11 @@ pass-rate and TTFT metrics, the consolidation policy, and the current
 replacement-model run. Start at [`okf/index.md`](okf/index.md); each concept is
 readable on its own and links back to the underlying source data.
 
+## Acknowledgements
+
+Developed by [Reinvently](https://reinvently.co.uk/) — independent
+AI research for UK technology leaders.
+
 ## License
 
 [MIT](LICENSE) © 2026 Ed Yau.
