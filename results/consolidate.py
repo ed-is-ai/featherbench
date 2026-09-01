@@ -68,6 +68,16 @@ SOURCE_RUNS = [
     # repeated trials, so list-from-tokens is the comparable figure — same
     # promo-stripping intent as gpt-5.6-luna in c962bd6.
     ("results-20260829T191258Z.jsonl", "2026-08-29"),
+    # fable-5-1 (anthropic/claude-fable-5.1), 1 trial x 28 tasks, rubric-on
+    # (fable-5 judge), effort:high, max_tokens 64000 — same sibling config as
+    # fable-5 / opus-5, no-fallback anthropic route. New catalog entry, appears
+    # in no other source run. cost_usd is left as billed: OpenRouter charged
+    # every record at the exact $10 / $50 per 1M list rate (endpoint discount 0,
+    # per-record ratio 1.00 across all 28), so billed == list and no correction
+    # applies. The run was completed in two segments (credit top-up mid-run);
+    # results-20260901T221834Z.jsonl is the --rerun-errored consolidation that
+    # supersedes results-20260901T215900Z.jsonl per rule 1.
+    ("results-20260901T221834Z.jsonl", "2026-09-01"),
 ]
 
 RETIRED_TASKS = set()
