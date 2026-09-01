@@ -6,6 +6,13 @@
     "effort": "high",
     "max_tokens": 64000
   },
+  "fable-5-1": {
+    "enabled": true,
+    "model": "anthropic/claude-fable-5.1",
+    "provider_order": ["anthropic"],
+    "effort": "high",
+    "max_tokens": 64000
+  },
   "opus-5": {
     "enabled": true,
     "model": "anthropic/claude-opus-5",
