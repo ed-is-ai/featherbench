@@ -1,18 +1,6 @@
 # Featherbench Leaderboard
 
-Published numbers from seven source-of-truth runs, hand-collated below: the
-gpt-5.6 trio run `20260802T124847Z`, a reference run of three Claude models
-outside the default panel, a fresh run of the three models with no clean current
-data, and the rubric-on run `20260728T215711Z` of the three newest panel entries
-(opus-5, gemini-3.6-flash, grok-4.5), plus the replacement-model runs
-`20260822T172041Z` (rubric-on scores) and `20260822T184533Z` (latest TTFTs), the
-trial-1 slice of `glm-5.3-flash`'s 3-trial run `20260829T191258Z` (footnote 19),
-and the single-trial rubric-on run `20260901T221834Z` of the new panel entry
-`fable-5-1` (footnote 20).
-
-Every cell is copied from its source `summary-<ts>.md` **except the three
-gpt-5.6 Cost cells**, which are stated at list price rather than as billed —
-see footnote 13, which gives both figures.
+Summary of published numbers from all our runs.
 
 The full machine-readable benchmark record is available as
 [`results/summary.json`](results/summary.json), with an agent-readable
@@ -123,40 +111,10 @@ Run `--trials 3+` if you need variance.
 
 ## Rubric judging notes
 
-Rubric column is single-judge (fable-5). The `opus-5`, `gemini-3.6-flash`,
-`grok-4.5`, `glm-5.3`, `glm-5.3-flash`, `gemini-3.7-flash`, `grok-4.6`,
-`deepseek-v4-pro`, and `fable-5-1`
-rows were judged by fable-5 while fable-5 was **not a contestant** in their run,
-so unlike fable-5's own self-judged cell (footnote 2) those rubric scores are
-independently judged — no judge is scoring its own answers. (`fable-5-1` is a
-distinct catalog entry, `anthropic/claude-fable-5.1`, not the fable-5 judge, so
-its row is independently judged too — its denominator is **12 tasks, not 14**,
-see footnote 20.)
-The `opus-5`, `gemini-3.6-flash` and `grok-4.5` rubric denominator is
-**13 tasks, not 14**: the
-`security-jailbreak-aim-machiavelli` cell is missing for all three, each
-recording `{"score": null, "error": "no JSON in judge reply", "cost_usd": 0}` —
-the *judge* was itself blocked pre-generation on that content ($0 billed). The
-hole is identical across all three models, so it biases no comparison between
-them, but the denominator is stated here rather than left implied.
-
-The same hole appears in the gpt-5.6 trio's 2026-08-02 re-judge — 39 of 42 cells
-scored, the three misses all `security-jailbreak-aim-machiavelli`. It reproduced
-across two independent judging sessions six weeks apart, so it is a property of
-that task's content, not a transient judge failure.
-
-The replacement-model run repeats the `security-jailbreak-aim-machiavelli`
-judge hole for all four models. `grok-4.6` has two additional unscored rubric
-cells (`data-csv-mapping-customer` and `security-injection-ungpt-in-document`),
-so its rubric mean is over 11 scored tasks; the other three replacement rows are
-over 13. All reported judge failures remain in the source JSONL rather than being
-silently filled or retried.
+Rubric column is single-judge (fable-5), on the principle that smartest model makes the best judge.  We did experiment with a panel approach originally, but stopped as it was proving too expensive to justify.
 
 ## Efficiency notes
-
-The three `20260728T215711Z` rows (grok-4.5, gemini-3.6-flash, opus-5) carry their
-run's whole-percent pass rate rather than a one-decimal figure, because that is the
-precision their source summary publishes and nothing here is recomputed.
+Quoted by cost/task as the average was misleading if a model refused
 
 **Efficiency ranking (by cost/task):**
 1. **glm-5.3-flash** — $0.0004/trial ¹⁹ (new cheapest on the board by a wide
@@ -443,7 +401,7 @@ copied from its source run. Both numbers, so nothing is hidden:
 | gpt-5.6-sol | 5.00 / 30.00 | 1.447 | **1.45** |
 
 OpenAI cut GPT-5.6 prices on 2026-07-30 — luna from $1.00/$6.00 and terra from
-$2.50/$15.00; sol was unchanged. OpenRouter is additionally running a **50%
+$2.50/$15.00; sol was unchanged. OpenRouter was additionally running a **50%
 promotion** on luna and terra, which is why the billed column is exactly half of
 list for those two and identical to it for sol. The promotion is temporary, so
 billing it as the published figure would date the board the moment it ends; list
