@@ -83,6 +83,12 @@ SOURCE_RUNS = [
     # ($0.30 in / $1.20 out per 1M); no correction was needed. New model entry;
     # no prior source run to supersede.
     ("results-20260912T171101Z.jsonl", "2026-09-12"),
+    # gemini-3.8-flash and gpt-6-astra, 1 trial x 28 tasks each, rubric-on
+    # (fable-5), effort:high, exact google-vertex/global and openai routes.
+    # usage.cost matched list rates ($0.75 / $3.75 per 1M for Gemini and
+    # $10 / $50 per 1M for Astra); no correction was needed. New model entries;
+    # neither appeared in an earlier source run.
+    ("results-20260912T185245Z.jsonl", "2026-09-12"),
 ]
 
 RETIRED_TASKS = set()
