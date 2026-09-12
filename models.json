@@ -96,6 +96,13 @@
     "effort": "high",
     "sampling": {"seed": 7}
   },
+  "gpt-6-astra": {
+    "enabled": true,
+    "model": "openai/gpt-6-astra",
+    "provider_order": ["openai"],
+    "effort": "high",
+    "sampling": {"seed": 7}
+  },
   "gpt-5": {
     "enabled": false,
     "model": "openai/gpt-5",
@@ -167,6 +174,14 @@
   "gemini-3.7-flash": {
     "enabled": true,
     "model": "google/gemini-3.7-flash",
+    "provider_order": ["google-vertex/global"],
+    "effort": "high",
+    "max_tokens": 64000,
+    "sampling": {"seed": 7}
+  },
+  "gemini-3.8-flash": {
+    "enabled": true,
+    "model": "google/gemini-3.8-flash",
     "provider_order": ["google-vertex/global"],
     "effort": "high",
     "max_tokens": 64000,
