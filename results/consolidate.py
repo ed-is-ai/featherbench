@@ -78,6 +78,11 @@ SOURCE_RUNS = [
     # results-20260901T221834Z.jsonl is the --rerun-errored consolidation that
     # supersedes results-20260901T215900Z.jsonl per rule 1.
     ("results-20260901T221834Z.jsonl", "2026-09-01"),
+    # deepseek-v4.1-flash, 1 trial x 28 tasks, rubric-on (fable-5), effort:high,
+    # exact modal route. usage.cost matched the current Modal list rate
+    # ($0.30 in / $1.20 out per 1M); no correction was needed. New model entry;
+    # no prior source run to supersede.
+    ("results-20260912T171101Z.jsonl", "2026-09-12"),
 ]
 
 RETIRED_TASKS = set()
