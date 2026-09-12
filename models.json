@@ -239,5 +239,12 @@
     "provider_order": ["openrouter"],
     "effort": "high",
     "max_tokens": 64000
+  },
+  "deepseek-v4.1-flash": {
+    "enabled": true,
+    "model": "deepseek/deepseek-v4.1-flash",
+    "provider_order": ["modal"],
+    "effort": "high",
+    "sampling": {"temperature": 0.0, "top_p": 1.0}
   }
 }
