@@ -23,7 +23,7 @@ status: stable
 | `wall_clock_s` | number/null | Full streamed-response duration. |
 | `input_tokens` | integer/null | Provider-reported input token count. |
 | `output_tokens` | integer/null | Provider-reported output token count. |
-| `cost_usd` | number/null | Provider-reported answer cost in USD. |
+| `cost_usd` | number/null | Answer cost in USD; selected runs are normalized to list rates from token counts (see leaderboard cost notes). |
 | `rubric_mean` | number/null | Mean blind judge score for rubric tasks. |
 | `source_file` | string | Source JSONL file used during consolidation. |
 | `run_date` | date | Date assigned to the source run. |

@@ -28,7 +28,7 @@ Run `--trials 3+` if you need variance.
 | grok-4.5 | 96% [82–99] ⁶ ⁹ | 0.17 | 4.6 | 7.7 | No |
 | kimi-k3 | 96% [82–99] ¹² | 0.93 ¹² | 26.4 | 9.5 | No |
 | fable-5-1 | 96% [82–99] ²⁰ | 2.68 ²⁰ | 7.3 | 9.5 ²⁰ | Yes |
-| gemini-3.7-flash | 93% [77–98] ¹⁸ | 0.11 | 8.5 | 8.8 | Yes |
+| gemini-3.7-flash | 93% [77–98] ¹⁸ | 0.21 ²³ | 8.5 | 8.8 | Yes |
 | gemini-3.8-flash | 93% [77–98] ²² | 0.27 ²² | 9.3 | 8.9 ²² | Yes |
 | sonnet-5 | 93% [77–98] ³ | 0.33 | 1.8 | 8.8 ¹ | No |
 | glm-5.2 | 89% [73–96] ¹¹ | 0.18 | 13.1 | 8.6 | No |
@@ -53,7 +53,7 @@ Run `--trials 3+` if you need variance.
 | deepseek-v4.1-flash | 8.8 ²¹ | 100% [88–100] ²¹ | 0.09 ²¹ | 22.0 | Yes |
 | sonnet-5 | 8.8 ¹ | 93% [77–98] ³ | 0.33 | 1.8 | No |
 | gpt-5.6-sol | 8.8 ¹⁴ | 86% [69–94] ¹⁴ | 1.45 ¹³ | 6.8 | Yes |
-| gemini-3.7-flash | 8.8 | 93% [77–98] ¹⁸ | 0.11 | 8.5 | Yes |
+| gemini-3.7-flash | 8.8 | 93% [77–98] ¹⁸ | 0.21 ²³ | 8.5 | Yes |
 | grok-4.6 | 8.8 | 96% [82–99] ¹⁷ | 0.34 | 13.6 | Yes |
 | gemini-3.6-flash | 8.8 | 96% [82–99] ⁶ ¹⁰ | 0.48 | 6.6 | No |
 | gpt-5.5 | 8.7 | 96% [82–99] ³ | 1.43 | 13.2 | Yes |
@@ -72,10 +72,10 @@ Run `--trials 3+` if you need variance.
 | glm-5.3-flash | 100% ¹⁹ | 238 | 643 | 881 | $0.0004 ¹⁹ |
 | gpt-5.6-luna | 78.6% ¹⁵ | 220 | 1,870 | 2,090 | $0.0023 ¹³ |
 | deepseek-v4-pro | 96.4% | 323 | 3,461 | 3,784 | $0.0029 |
-| gemini-3.7-flash | 92.9% | 233 | 1,969 | 2,202 | $0.0038 |
 | haiku-4-5 | 96.4% | 287 | 817 | 1,104 | $0.0044 |
 | grok-4.5 | 96% ⁹ | 433 | 898 | 1,331 | $0.0060 |
 | glm-5.2 | 89.3% ¹¹ | 238 | 1,371 | 1,609 | $0.0064 |
+| gemini-3.7-flash | 92.9% | 233 | 1,969 | 2,202 | $0.0076 ²³ |
 | gemini-3.8-flash | 92.9% ²² | 233 | 2,537 | 2,770 | $0.0097 ²² |
 | glm-5.3 | 100% | 238 | 2,223 | 2,461 | $0.0101 |
 | sonnet-5 | 92.9% | 362 | 1,119 | 1,481 | $0.0119 |
@@ -137,13 +137,13 @@ Quoted by cost/task as the average was misleading if a model refused
    trial is not cheap per *correct* answer)
 3. **deepseek-v4-pro** — $0.0029/trial (the low price comes with a very long
    3,461-token mean output and 39.1 s median TTFT)
-4. **gemini-3.7-flash** — $0.0038/trial
-5. **haiku-4-5** — $0.0044/trial (cheapest of the unrepriced rows, and most
+4. **haiku-4-5** — $0.0044/trial (cheapest of the unrepriced rows, and most
    concise at 817 tokens)
-6. **grok-4.5** — $0.0060/trial (cheapest of the older panel entries, and by far the most
+5. **grok-4.5** — $0.0060/trial (cheapest of the older panel entries, and by far the most
    concise reasoning row at 898 output tokens — partly because it answers some
    prompts with a flat refusal; see footnote 9)
-7. **glm-5.2** — $0.0064/trial
+6. **glm-5.2** — $0.0064/trial
+7. **gemini-3.7-flash** — $0.0076/trial ²³
 8. **gemini-3.8-flash** — $0.0097/trial ²² (92.9% on this single-trial run,
    with 2,537 mean output tokens and 9.3 s median TTFT)
 9. **glm-5.3** — $0.0101/trial
@@ -670,6 +670,16 @@ Astra, displayed as **$0.27** and **$1.54** in the headline table and
 **$0.0097/trial** and **$0.0550/trial** in the efficiency table. The raw run is
 `results-20260912T185245Z.jsonl`; both models' consolidated records are in
 `results/summary.json`.
+
+²³ **gemini-3.7-flash cost corrected to Gemini 3.8's rate.** Its August run
+was billed at $0.375 / $1.875 per M in–out, half the $0.75 / $3.75 rate
+billed for Gemini 3.8 Flash. The published cost now recomputes all 28 answers
+from 6,527 input and 55,133 output tokens at the common rate: **$0.211644
+total, $0.0076/trial** (original billed total: $0.105822). At equal rates,
+Gemini 3.8's $0.2713065 total is 28% higher, reflecting its 71,043 output
+tokens rather than a different price per token. The source run remains
+unchanged; `results/consolidate.py` applies the correction to the published
+`results/summary.json` records.
 
 - **Refusals are recorded, not hidden.** If a safety classifier declines a
   request the trial is logged as a refusal with its category — not silently
