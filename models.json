@@ -373,5 +373,13 @@
     "provider_order": ["modal"],
     "effort": "high",
     "sampling": {"temperature": 0.0, "top_p": 1.0}
+  },
+  "grok-4-7": {
+    "enabled": true,
+    "model": "x-ai/grok-4.7",
+    "provider_order": ["xai"],
+    "effort": "high",
+    "max_tokens": 64000,
+    "sampling": {"seed": 7}
   }
 }
