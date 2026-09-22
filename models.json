@@ -381,5 +381,26 @@
     "effort": "high",
     "max_tokens": 64000,
     "sampling": {"seed": 7}
+  },
+  "opus-5-5": {
+    "enabled": true,
+    "model": "anthropic/claude-opus-5.5",
+    "provider_order": ["anthropic"],
+    "effort": "high",
+    "max_tokens": 64000
+  },
+  "gpt-6-luna": {
+    "enabled": true,
+    "model": "openai/gpt-6-luna",
+    "provider_order": ["openai"],
+    "effort": "high",
+    "sampling": {"seed": 7}
+  },
+  "gpt-6-sol": {
+    "enabled": true,
+    "model": "openai/gpt-6-sol",
+    "provider_order": ["openai"],
+    "effort": "high",
+    "sampling": {"seed": 7}
   }
 }
