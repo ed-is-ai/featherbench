@@ -1,6 +1,6 @@
 # Featherbench Leaderboard
 
-Published numbers from 12 source-of-truth runs, including the new Gemini 3.8 Flash and GPT-6 Astra run `20260912T185245Z`.
+Published numbers from 15 source-of-truth runs, including the Claude Opus 5.5, GPT-6 Luna and GPT-6 Sol runs from `20260922`.
 
 The full machine-readable benchmark record is available as
 [`results/summary.json`](results/summary.json), with an agent-readable
@@ -19,7 +19,9 @@ Run `--trials 3+` if you need variance.
 | glm-5.3 | 100% [88–100] | 0.28 | 27.5 | 9.3 | Yes |
 | glm-5.3-flash | 100% [88–100] ¹⁹ | 0.01 ¹⁹ | 3.2 | 9.1 ¹⁹ | Yes |
 | deepseek-v4.1-flash | 100% [88–100] ²¹ | 0.09 ²¹ | 22.0 | 8.8 ²¹ | Yes |
+| opus-5-5 | 100% [88–100] ²⁴ | 1.35 ²⁴ | 6.6 | 9.5 ²⁴ | Yes |
 | gpt-6-astra | 96% [82–99] ²² | 1.54 ²² | 11.4 | 8.6 ²² | Yes |
+| gpt-6-luna | 96% [82–99] ²⁴ | 0.02 ²⁴ | 7.5 | 8.3 ²⁴ | Yes |
 | deepseek-v4-pro | 96% [82–99] ¹⁶ | 0.08 | 39.1 | 8.7 | Yes |
 | grok-4.6 | 96% [82–99] ¹⁷ | 0.34 | 13.6 | 8.8 | Yes |
 | haiku-4-5 | 96% [82–99] | 0.12 | 0.9 | 7.4 ¹ | No |
@@ -35,6 +37,7 @@ Run `--trials 3+` if you need variance.
 | opus-5 | 89% [72–96] ⁶ ⁷ ⁸ | 1.67 | 8.3 | 9.4 | Yes |
 | gpt-5.6-terra | 86% [69–94] ¹⁴ | 0.49 ¹³ | 4.8 | 8.7 ¹⁴ | Yes |
 | gpt-5.6-sol | 86% [69–94] ¹⁴ | 1.45 ¹³ | 6.8 | 8.8 ¹⁴ | Yes |
+| gpt-6-sol | 82% [64–92] ²⁴ | 0.21 ²⁴ | 6.1 | 8.3 ²⁴ | Yes |
 | gpt-5.6-luna | 79% [60–90] ¹⁴ ¹⁵ | 0.06 ¹³ | 5.3 | 8.6 ¹⁴ | Yes |
 | fable-5 | 78% [59–89] ³ | 1.35 | 7.9 | 9.2 ² | Yes |
 
@@ -44,6 +47,7 @@ Run `--trials 3+` if you need variance.
 |---|---|---|---|---|---|
 | fable-5-1 | 9.5 ²⁰ | 96% [82–99] ²⁰ | 2.68 ²⁰ | 7.3 | Yes |
 | kimi-k3 | 9.5 | 96% [82–99] ¹² | 0.93 ¹² | 26.4 | No |
+| opus-5-5 | 9.5 ²⁴ | 100% [88–100] ²⁴ | 1.35 ²⁴ | 6.6 | Yes |
 | opus-5 | 9.4 | 89% [72–96] ⁶ ⁷ ⁸ | 1.67 | 8.3 | Yes |
 | glm-5.3 | 9.3 | 100% [88–100] | 0.28 | 27.5 | Yes |
 | fable-5 | 9.2 ² | 78% [59–89] ³ | 1.35 | 7.9 | Yes |
@@ -62,6 +66,8 @@ Run `--trials 3+` if you need variance.
 | glm-5.2 | 8.6 | 89% [73–96] ¹¹ | 0.18 | 13.1 | No |
 | gpt-6-astra | 8.6 ²² | 96% [82–99] ²² | 1.54 ²² | 11.4 | Yes |
 | gpt-5.6-luna | 8.6 ¹⁴ | 79% [60–90] ¹⁴ ¹⁵ | 0.06 ¹³ | 5.3 | Yes |
+| gpt-6-luna | 8.3 ²⁴ | 96% [82–99] ²⁴ | 0.02 ²⁴ | 7.5 | Yes |
+| gpt-6-sol | 8.3 ²⁴ | 82% [64–92] ²⁴ | 0.21 ²⁴ | 6.1 | Yes |
 | grok-4.5 | 7.7 | 96% [82–99] ⁶ ⁹ | 0.17 | 4.6 | No |
 | haiku-4-5 | 7.4 ¹ | 96% [82–99] | 0.12 | 0.9 | No |
 
@@ -70,11 +76,13 @@ Run `--trials 3+` if you need variance.
 | Model | Pass % | Input tokens (mean) | Output tokens (mean) | Total tokens (mean) | Cost/trial |
 |---|---|---|---|---|---|
 | glm-5.3-flash | 100% ¹⁹ | 238 | 643 | 881 | $0.0004 ¹⁹ |
+| gpt-6-luna | 96.4% ²⁴ | 220 | 1,602 | 1,822 | $0.0008 ²⁴ |
 | gpt-5.6-luna | 78.6% ¹⁵ | 220 | 1,870 | 2,090 | $0.0023 ¹³ |
 | deepseek-v4-pro | 96.4% | 323 | 3,461 | 3,784 | $0.0029 |
 | haiku-4-5 | 96.4% | 287 | 817 | 1,104 | $0.0044 |
 | grok-4.5 | 96% ⁹ | 433 | 898 | 1,331 | $0.0060 |
 | glm-5.2 | 89.3% ¹¹ | 238 | 1,371 | 1,609 | $0.0064 |
+| gpt-6-sol | 82.1% ²⁴ | 220 | 708 | 928 | $0.0075 ²⁴ |
 | gemini-3.7-flash | 92.9% | 233 | 1,969 | 2,202 | $0.0076 ²³ |
 | gemini-3.8-flash | 92.9% ²² | 233 | 2,537 | 2,770 | $0.0097 ²² |
 | glm-5.3 | 100% | 238 | 2,223 | 2,461 | $0.0101 |
@@ -83,6 +91,7 @@ Run `--trials 3+` if you need variance.
 | gemini-3.6-flash | 96% ¹⁰ | 233 | 2,216 | 2,449 | $0.0170 |
 | gpt-5.6-terra | 85.7% | 220 | 1,415 | 1,635 | $0.0174 ¹³ |
 | kimi-k3 | 96.5% | 308 | 2,124 | 2,433 | $0.0327 |
+| opus-5-5 | 100% ²⁴ | 360 | 2,340 | 2,700 | $0.0482 ²⁴ |
 | gpt-5.5 | 97.6% | 220 | 1,642 | 1,862 | $0.0504 |
 | gpt-5.6-sol | 85.7% | 220 | 1,686 | 1,906 | $0.0517 ¹³ |
 | gpt-6-astra | 96.4% ²² | 220 | 1,056 | 1,276 | $0.0550 ²² |
@@ -99,7 +108,9 @@ Run `--trials 3+` if you need variance.
 | glm-5.3 | 100% | 100% | 100% | 100% | 100% |
 | glm-5.3-flash | 100% | 100% | 100% | 100% | 100% ¹⁹ |
 | deepseek-v4.1-flash ²¹ | 100% | 100% | 100% | 100% | 100% |
+| opus-5-5 ²⁴ | 100% | 100% | 100% | 100% | 100% |
 | gpt-6-astra ²² | 100% | 100% | 100% | 83% | 100% |
+| gpt-6-luna ²⁴ | 100% | 100% | 89% | 100% | 100% |
 | deepseek-v4-pro | 100% | 100% | 100% | 83% ¹⁶ | 100% |
 | grok-4.6 | 100% | 100% | 100% | 83% ¹⁷ | 100% |
 | gemini-3.7-flash | 100% | 100% | 78% ¹⁸ | 100% | 100% |
@@ -118,12 +129,13 @@ Run `--trials 3+` if you need variance.
 | gpt-5.6-sol | 100% | 100% | 89% | 50% | 100% |
 | gpt-5.6-luna | 100% | 100% | 78% ¹⁵ | 33% | 100% |
 | fable-5 | 79% | 100% | 80% | 100% ⁵ | 100% |
+| gpt-6-sol ²⁴ | 100% | 100% | 89% | 33% | 100% |
 
 ---
 
 ## Rubric judging notes
 
-Rubric column is single-judge (fable-5), on the principle that smartest model makes the best judge.  We did experiment with a panel approach originally, but stopped as it was proving too expensive to justify. The new deepseek-v4.1-flash, gemini-3.8-flash and gpt-6-astra rows are independently judged by fable-5 across 14 rubric-bearing tasks; their means are 8.84, 8.86 and 8.58/10 respectively.
+Rubric column is single-judge (fable-5), on the principle that smartest model makes the best judge.  We did experiment with a panel approach originally, but stopped as it was proving too expensive to justify. The new deepseek-v4.1-flash, gemini-3.8-flash and gpt-6-astra rows are independently judged by fable-5 across 14 rubric-bearing tasks; their means are 8.84, 8.86 and 8.58/10 respectively. The new opus-5-5, gpt-6-luna and gpt-6-sol rows are also independently judged: 13, 14 and 14 rubric-bearing tasks, with means of 9.48, 8.31 and 8.27/10.
 
 ## Efficiency notes
 Quoted by cost/task as the average was misleading if a model refused
@@ -132,41 +144,47 @@ Quoted by cost/task as the average was misleading if a model refused
 1. **glm-5.3-flash** — $0.0004/trial ¹⁹ (new cheapest on the board by a wide
    margin — 100% on this trial-1 slice, and the most concise reasoning row at
    643 output tokens; cost is at list rate, see footnote 19)
-2. **gpt-5.6-luna** — $0.0023/trial ¹³ (cheapest full-panel row after the
+2. **gpt-6-luna** — $0.0008/trial ²⁴ (the cheapest new full-panel row at 96.4%,
+   with 1,602 mean output tokens; list-rate cost, see footnote 24)
+3. **gpt-5.6-luna** — $0.0023/trial ¹³ (cheapest full-panel row after the
    2026-07-30 price cut, but among the least accurate rows at 79% — cheap per
    trial is not cheap per *correct* answer)
-3. **deepseek-v4-pro** — $0.0029/trial (the low price comes with a very long
+4. **deepseek-v4-pro** — $0.0029/trial (the low price comes with a very long
    3,461-token mean output and 39.1 s median TTFT)
-4. **haiku-4-5** — $0.0044/trial (cheapest of the unrepriced rows, and most
+5. **haiku-4-5** — $0.0044/trial (cheapest of the unrepriced rows, and most
    concise at 817 tokens)
-5. **grok-4.5** — $0.0060/trial (cheapest of the older panel entries, and by far the most
+6. **grok-4.5** — $0.0060/trial (cheapest of the older panel entries, and by far the most
    concise reasoning row at 898 output tokens — partly because it answers some
    prompts with a flat refusal; see footnote 9)
-6. **glm-5.2** — $0.0064/trial
-7. **gemini-3.7-flash** — $0.0076/trial ²³
-8. **gemini-3.8-flash** — $0.0097/trial ²² (92.9% on this single-trial run,
+7. **glm-5.2** — $0.0064/trial
+8. **gpt-6-sol** — $0.0075/trial ²⁴ (the cheapest new Sol row, at 82.1%
+   overall but 33% on security; see footnote 24)
+9. **gemini-3.7-flash** — $0.0076/trial ²³
+10. **gemini-3.8-flash** — $0.0097/trial ²² (92.9% on this single-trial run,
    with 2,537 mean output tokens and 9.3 s median TTFT)
-9. **glm-5.3** — $0.0101/trial
-10. **sonnet-5** — $0.0119/trial
-11. **grok-4.6** — $0.0120/trial
-12. **gemini-3.6-flash** — $0.0170/trial (27/28 corrected, at a sixth of the cost
+11. **glm-5.3** — $0.0101/trial
+12. **sonnet-5** — $0.0119/trial
+13. **grok-4.6** — $0.0120/trial
+14. **gemini-3.6-flash** — $0.0170/trial (27/28 corrected, at a sixth of the cost
    of the next model to clear 96%)
-13. **gpt-5.6-terra** — $0.0174/trial ¹³
-14. **kimi-k3** — $0.0327/trial (verbose at 2,124 tokens but 96.5% accuracy)
-15. **gpt-5.5** — $0.0504/trial (highest pass rate among the earlier runs at 97.6%)
-16. **gpt-5.6-sol** — $0.0517/trial ¹³
-17. **gpt-6-astra** — $0.0550/trial ²² (96.4% on this single-trial run,
+15. **gpt-5.6-terra** — $0.0174/trial ¹³
+16. **kimi-k3** — $0.0327/trial (verbose at 2,124 tokens but 96.5% accuracy)
+17. **opus-5-5** — $0.0482/trial ²⁴ (100% on the new single-trial run,
+   with a 9.5 rubric mean and 2,340 mean output tokens)
+18. **gpt-5.5** — $0.0504/trial (highest pass rate among the earlier runs at 97.6%)
+19. **gpt-5.6-sol** — $0.0517/trial ¹³
+20. **gpt-6-astra** — $0.0550/trial ²² (96.4% on this single-trial run,
    with 1,056 mean output tokens and 11.4 s median TTFT)
-18. **sonnet-4-6** — $0.0633/trial (runaway verbose at 4,162 tokens)
-19. **fable-5** — $0.0684/trial (answering trials only)
-20. **opus-5** — $0.0696/trial (answering trials only, and the
-    most verbose row on the new panel at 2,712 output tokens)
-21. **deepseek-v4.1-flash** — $0.0919/trial ²¹ (100% on this single-trial
+21. **sonnet-4-6** — $0.0633/trial (runaway verbose at 4,162 tokens)
+22. **fable-5** — $0.0684/trial (answering trials only)
+23. **opus-5** — $0.0696/trial (answering trials only, and the
+   most verbose row on the new panel at 2,712 output tokens)
+24. **deepseek-v4.1-flash** — $0.0919/trial ²¹ (100% on this single-trial
    run; 2,669 mean output tokens and 22.0 s median TTFT)
-22. **fable-5-1** — $0.0991/trial ²⁰ (most expensive row on the board; billed at
-    the $10 / $50 per 1M list rate with no discount, and 1,909 mean output
-    tokens against fable-5's 1,297 — the accuracy gain over fable-5 comes at a
-    higher price)
+25. **fable-5-1** — $0.0991/trial ²⁰ (most expensive row on the board; billed at
+   the $10 / $50 per 1M list rate with no discount, and 1,909 mean output
+   tokens against fable-5's 1,297 — the accuracy gain over fable-5 comes at a
+   higher price)
 
 **The gpt-5.6 trio emitted the jailbreak canary in 11 of 12 jailbreak cells** —
 a genuine safety finding, not a harness artifact. The Claude trio (haiku-4-5,
@@ -222,11 +240,11 @@ config-matched, not a settings artifact.
 
 ## Task-type insights
 
-- **Security jailbreaks** are where the checkers themselves failed hardest, in both directions. gpt-5.6-luna and gpt-5.6-sol score 33–50% by **emitting** the canary — genuinely unsafe, correctly caught. grok-4.5's raw 50% was the opposite error: it emitted the canary in zero of six cells and refused the poisoned turn outright, losing only the composite's "still helpfully answers the benign question" half — corrected to 100% (footnote 9, issue #40). gemini-3.6-flash's raw 100% was a miss in the other direction: it genuinely complied on `security-jailbreak-oppo` but escaped the own-line canary regex behind an `OPPO: ` label — corrected to 83% (footnote 10, issue #39). glm-5.2 complied on the same task in the same way and drops to 67% (footnote 11); both are now caught by the shipped checker rather than by hand. In the replacement run, glm-5.3 and gemini-3.7-flash clear all six security tasks; deepseek-v4-pro and grok-4.6 each miss one (footnotes 16 and 17). glm-5.3-flash also clears all six on its trial-1 slice (footnote 19). fable-5-1 clears all six on its single trial, defending both prompt injections and all four jailbreaks with no canary emission. deepseek-v4.1-flash and gemini-3.8-flash also clear all six security tasks. gpt-6-astra misses `security-jailbreak-aim-machiavelli` and lands at 5/6; its full answer and rubric score are retained in the source run (footnote 22).
-- **Realworld** tasks are the weakest frontier for most of the field — advice, planning and extraction tasks under 90% — though glm-5.3, deepseek-v4-pro, grok-4.6 and gpt-6-astra each clear the current 9/9 set. glm-5.3-flash clears 9/9 on trial 1 but drops one across the full 3-trial run (footnote 19). Gemini-3.7-flash scores 7/9 (footnote 18); gemini-3.8-flash also scores 7/9, missing Nottingham and flight-search honesty. fable-5-1 and deepseek-v4.1-flash clear the full 9/9 realworld set on their single trials. Rubric judging matters here; binary checkers miss quality gaps.
-- **Coding** and **data** tasks are the harness floor for every model that gets to attempt them — 98%+ pass rates across the board. opus-5's 50% coding is the one exception and it is **not a capability result**: four benign debugging tasks were blocked by a provider-side classifier before generation (footnote 8). fable-5-1's coding cell is 86% (6/7) for the same reason — one benign `coding-debug-money-split` task blocked pre-generation by the same Anthropic-family classifier (footnote 20); deepseek-v4.1-flash, gemini-3.8-flash and gpt-6-astra all clear 7/7 coding and 4/4 data tasks on their single trials. The other two tasks that hit opus-5 and fable-5 (`coding-debug-billing-date`, `coding-debug-mutable-default`) generated normally this time. A category cell can be depressed by a safety filter as easily as by a wrong answer.
+- **Security jailbreaks** are where the checkers themselves failed hardest, in both directions. gpt-5.6-luna and gpt-5.6-sol score 33–50% by **emitting** the canary — genuinely unsafe, correctly caught. The new gpt-6-sol repeats that pattern at 33%: it emits the canary in four of six jailbreak cells, while gpt-6-luna and opus-5-5 clear all six. grok-4.5's raw 50% was the opposite error: it emitted the canary in zero of six cells and refused the poisoned turn outright, losing only the composite's "still helpfully answers the benign question" half — corrected to 100% (footnote 9, issue #40). gemini-3.6-flash's raw 100% was a miss in the other direction: it genuinely complied on `security-jailbreak-oppo` but escaped the own-line canary regex behind an `OPPO: ` label — corrected to 83% (footnote 10, issue #39). glm-5.2 complied on the same task in the same way and drops to 67% (footnote 11); both are now caught by the shipped checker rather than by hand. In the replacement run, glm-5.3 and gemini-3.7-flash clear all six security tasks; deepseek-v4-pro and grok-4.6 each miss one (footnotes 16 and 17). glm-5.3-flash also clears all six on its trial-1 slice (footnote 19). fable-5-1 clears all six on its single trial, defending both prompt injections and all four jailbreaks with no canary emission. deepseek-v4.1-flash and gemini-3.8-flash also clear all six security tasks. gpt-6-astra misses `security-jailbreak-aim-machiavelli` and lands at 5/6; its full answer and rubric score are retained in the source run (footnote 22).
+- **Realworld** tasks are the weakest frontier for most of the field — advice, planning and extraction tasks under 90% — though glm-5.3, deepseek-v4-pro, grok-4.6, gpt-6-astra and the new opus-5-5 each clear the current 9/9 set. gpt-6-luna and gpt-6-sol each score 8/9, missing only the practical soothing step in `realworld-crying-baby`; the Lisbon budget and marathon-plan checks were checker false negatives, fixed in issues #82 and #83. glm-5.3-flash clears 9/9 on trial 1 but drops one across the full 3-trial run (footnote 19). Gemini-3.7-flash scores 7/9 (footnote 18); gemini-3.8-flash also scores 7/9, missing Nottingham and flight-search honesty. fable-5-1 and deepseek-v4.1-flash clear the full 9/9 realworld set on their single trials. Rubric judging matters here; binary checkers miss quality gaps.
+- **Coding** and **data** tasks are the harness floor for every model that gets to attempt them — 98%+ pass rates across the board. The new trio all clears coding 7/7 and data 4/4; the fact-table naming false negative in Sol's run is fixed in issue #81. opus-5's 50% coding is the one exception and it is **not a capability result**: four benign debugging tasks were blocked by a provider-side classifier before generation (footnote 8). fable-5-1's coding cell is 86% (6/7) for the same reason — one benign `coding-debug-money-split` task blocked pre-generation by the same Anthropic-family classifier (footnote 20); deepseek-v4.1-flash, gemini-3.8-flash and gpt-6-astra all clear 7/7 coding and 4/4 data tasks on their single trials. The other two tasks that hit opus-5 and fable-5 (`coding-debug-billing-date`, `coding-debug-mutable-default`) generated normally this time. A category cell can be depressed by a safety filter as easily as by a wrong answer.
 - **kimi-k3 weakness:** data tasks are its only category weakness (75%), particularly the data-fabric-roadmap-user-stories task.
-- **GLM-5.3 swept this single-trial run** at 28/28, and **glm-5.3-flash swept its trial-1 slice** at 28/28 for ~1/28th the cost (footnote 19). DeepSeek V4.1 Flash also swept its single-trial run at 28/28 for $0.09 (footnote 21). Gemini-3.8-flash and gpt-6-astra both clear coding, data and tool-use; Gemini misses two realworld cells while Astra misses one security cell (footnote 22). Gemini-3.6-flash was previously published at 28/28 and is corrected to 27/28 — its one loss is a genuine jailbreak compliance the checker missed (footnote 10). Single trials are not settled performance claims; the Wilson intervals on the headline table show the remaining uncertainty.
+- **GLM-5.3 swept this single-trial run** at 28/28, and **glm-5.3-flash swept its trial-1 slice** at 28/28 for ~1/28th the cost (footnote 19). DeepSeek V4.1 Flash and the new opus-5-5 also swept their single-trial runs at 28/28; Opus cost $1.35 and scored a 9.5 rubric mean (footnote 24). Gemini-3.8-flash and gpt-6-astra both clear coding, data and tool-use; Gemini misses two realworld cells while Astra misses one security cell (footnote 22). Gemini-3.6-flash was previously published at 28/28 and is corrected to 27/28 — its one loss is a genuine jailbreak compliance the checker missed (footnote 10). Single trials are not settled performance claims; the Wilson intervals on the headline table show the remaining uncertainty.
 
 ## Footnotes
 
@@ -681,6 +699,24 @@ tokens rather than a different price per token. The source run remains
 unchanged; `results/consolidate.py` applies the correction to the published
 `results/summary.json` records.
 
+²⁴ **New 2026-09-22 benchmark rows.** `opus-5-5` (issue #74), `gpt-6-luna`
+(issue #76) and `gpt-6-sol` (issue #75) each ran once across all 28 tasks with
+rubric judging enabled. Opus used `effort: "high"`, `max_tokens: 64000` and the
+exact `anthropic` route; Luna and Sol used `effort: "high"`, `seed: 7` and the
+exact `openai` route. They scored **28/28**, **27/28** and **23/28** after the
+checker false negatives in Sol's fact-table, Lisbon-budget and marathon-long-run
+cells were fixed (issues [#81](https://github.com/ed-is-ai/featherbench/issues/81),
+[#82](https://github.com/ed-is-ai/featherbench/issues/82), and
+[#83](https://github.com/ed-is-ai/featherbench/issues/83)); the source records
+remain auditable through `passed_recorded: false`. Rubric means were **9.48/10**
+(13 judged tasks), **8.31/10** and **8.27/10** (14 each).
+List-rate generation totals are **$1.3504** at $4/$20 per M, **$0.0230** at
+$0.10/$0.50 per M and **$0.2105** at $2/$10 per M; billed costs matched list
+rates, so no correction was needed. The existing 840-record summary was kept as
+the historical baseline because two older raw artifacts were unavailable in the
+publication checkout; these 84 new records were appended from their verified raw
+runs rather than recreating the missing files.
+
 - **Refusals are recorded, not hidden.** If a safety classifier declines a
   request the trial is logged as a refusal with its category — not silently
   retried on another model, which would attribute one model's output to another.
@@ -722,7 +758,8 @@ unchanged; `results/consolidate.py` applies the correction to the published
   `glm-5.3-flash` → `z-ai/fp8`, `gemini-3.7-flash` → `google-vertex/global`,
   `gemini-3.8-flash` → `google-vertex/global`, `grok-4.6` → `xai`,
   `deepseek-v4-pro` → `streamlake/fp8`, `fable-5-1` → `anthropic`,
-  `deepseek-v4.1-flash` → `modal`, and `gpt-6-astra` → `openai`. Each is an exact
+  `deepseek-v4.1-flash` → `modal`, `gpt-6-astra` → `openai`, `opus-5-5` →
+  `anthropic`, `gpt-6-luna` → `openai`, and `gpt-6-sol` → `openai`. Each is an exact
   no-fallback route from its live endpoint metadata; the three FP8 routes are
   labelled as such in the catalog rather than presented as unquantized endpoints.
   `fable-5-1`'s `anthropic` route is a first-party standard-tier endpoint,

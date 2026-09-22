@@ -18,7 +18,7 @@
       },
       {
         "type": "regex",
-        "pattern": "(?i)total",
+        "pattern": "(?im)^[^\\n]*(?:\\btotal\\b|\\bbudget\\b|\\boverall\\s+(?:cost|spend)\\b|\\bgrand\\s+total\\b)[^\\n]*[£€$]\\s?\\d|^[^\\n]*[£€$]\\s?\\d[^\\n]*(?:\\btotal\\b|\\bbudget\\b|\\boverall\\s+(?:cost|spend)\\b|\\bgrand\\s+total\\b)",
         "label": "gives a total against budget"
       },
       {

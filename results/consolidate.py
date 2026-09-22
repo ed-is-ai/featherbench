@@ -90,6 +90,18 @@ SOURCE_RUNS = [
     # $10 / $50 per 1M for Astra); no correction was needed. New model entries;
     # neither appeared in an earlier source run.
     ("results-20260912T185245Z.jsonl", "2026-09-12"),
+    # Claude Opus 5.5, issue #74, 1 trial x 28 tasks, rubric-on (fable-5), effort:high,
+    # max_tokens:64000, exact anthropic route. usage.cost matched the list rate
+    # ($4 / $20 per 1M); no correction was needed. New model entry.
+    ("results-20260922T222426Z.jsonl", "2026-09-22"),
+    # GPT-6 Luna, issue #76, 1 trial x 28 tasks, rubric-on (fable-5), effort:high,
+    # seed:7, exact openai route. usage.cost matched the list rate ($0.10 / $0.50
+    # per 1M); no correction was needed. New model entry.
+    ("results-20260922T223857Z.jsonl", "2026-09-22"),
+    # GPT-6 Sol, issue #75, 1 trial x 28 tasks, rubric-on (fable-5), effort:high,
+    # seed:7, exact openai route. usage.cost matched the list rate ($2 / $10 per
+    # 1M); no correction was needed. New model entry.
+    ("results-20260922T225829Z.jsonl", "2026-09-22"),
 ]
 
 RETIRED_TASKS = set()
