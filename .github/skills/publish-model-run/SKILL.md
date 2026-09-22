@@ -50,7 +50,7 @@ python -c "import json; json.load(open('models.json')); print('valid')"
 
 ```bash
 export OPENROUTER_API_KEY=<key>
-nohup python eval.py --models <key> --trials <N> > /tmp/run.log 2>&1 &
+nohup uv run --project . python eval.py --models <key> --trials <N> > /tmp/run.log 2>&1 &
 ```
 
 - **Launch from the top-level session, not a subagent** — a returning subagent's
