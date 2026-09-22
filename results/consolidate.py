@@ -55,9 +55,10 @@ SOURCE_RUNS = [
     ("results-20260802T124847Z-rejudged.jsonl", "2026-08-02"),
     ("results-20260717T200349Z-rejudged.jsonl", "2026-07-17"),
     ("results-20260728T215711Z.jsonl", "2026-07-28"),
-    # Replacement panel's complete rubric-on run. The later serial no-rubric
-    # TTFT probe is intentionally not a second aggregate source: it is a
-    # repeat measurement with one provider error and no rubric records.
+    # Replacement panel's complete rubric-on run. Gemini 3.7's usage.cost was
+    # half its $0.75/$3.75 per M list rate; normalize that model below so it
+    # can be compared with Gemini 3.8's list-rate cost. The later serial
+    # no-rubric TTFT probe is not a second aggregate source.
     ("results-20260822T172041Z.jsonl", "2026-08-22"),
     # glm-5.3-flash, 3 trials x 28 tasks, rubric-on (fable-5 judge), effort:high —
     # same methodology as the replacement panel above. Supersedes the earlier
@@ -78,6 +79,17 @@ SOURCE_RUNS = [
     # results-20260901T221834Z.jsonl is the --rerun-errored consolidation that
     # supersedes results-20260901T215900Z.jsonl per rule 1.
     ("results-20260901T221834Z.jsonl", "2026-09-01"),
+    # deepseek-v4.1-flash, 1 trial x 28 tasks, rubric-on (fable-5), effort:high,
+    # exact modal route. usage.cost matched the current Modal list rate
+    # ($0.30 in / $1.20 out per 1M); no correction was needed. New model entry;
+    # no prior source run to supersede.
+    ("results-20260912T171101Z.jsonl", "2026-09-12"),
+    # gemini-3.8-flash and gpt-6-astra, 1 trial x 28 tasks each, rubric-on
+    # (fable-5), effort:high, exact google-vertex/global and openai routes.
+    # usage.cost matched list rates ($0.75 / $3.75 per 1M for Gemini and
+    # $10 / $50 per 1M for Astra); no correction was needed. New model entries;
+    # neither appeared in an earlier source run.
+    ("results-20260912T185245Z.jsonl", "2026-09-12"),
 ]
 
 RETIRED_TASKS = set()
@@ -185,6 +197,8 @@ def main():
                 n_rescored += 1
 
             rec = {f: r.get(f) for f in BASE_FIELDS}
+            if fname == "results-20260822T172041Z.jsonl" and r["model"] == "gemini-3.7-flash":
+                rec["cost_usd"] = (r["input_tokens"] * 0.75 + r["output_tokens"] * 3.75) / 1_000_000
             rec.update({
                 "passed": passed,
                 "check_detail": detail,
@@ -220,6 +234,8 @@ def main():
                           "issue's checker fix lands — so a shrinking OVERRIDES list is the "
                           "measure of progress, not a permanent fixture."),
             "passed": "final verdict (re-scored, then overrides applied); passed_recorded = source value",
+            "cost_usd": ("provider-reported except Gemini 3.7 Flash's 2026-08-22 run, "
+                         "normalized from token counts at $0.75/$3.75 per million"),
         },
         "source_runs": [{"file": f, "date": d} for f, d in SOURCE_RUNS],
         "counts": {

@@ -132,6 +132,13 @@
       "seed": 7
     }
   },
+  "gpt-6-astra": {
+    "enabled": true,
+    "model": "openai/gpt-6-astra",
+    "provider_order": ["openai"],
+    "effort": "high",
+    "sampling": {"seed": 7}
+  },
   "gpt-5": {
     "enabled": false,
     "model": "openai/gpt-5",
@@ -245,6 +252,14 @@
       "seed": 7
     }
   },
+  "gemini-3.8-flash": {
+    "enabled": true,
+    "model": "google/gemini-3.8-flash",
+    "provider_order": ["google-vertex/global"],
+    "effort": "high",
+    "max_tokens": 64000,
+    "sampling": {"seed": 7}
+  },
   "deepseek-v4-pro": {
     "enabled": true,
     "model": "deepseek/deepseek-v4-pro",
@@ -355,13 +370,8 @@
   "deepseek-v4.1-flash": {
     "enabled": true,
     "model": "deepseek/deepseek-v4.1-flash",
-    "provider_order": [
-      "deepseek"
-    ],
+    "provider_order": ["modal"],
     "effort": "high",
-    "sampling": {
-      "temperature": 0,
-      "top_p": 1
-    }
+    "sampling": {"temperature": 0.0, "top_p": 1.0}
   }
 }
