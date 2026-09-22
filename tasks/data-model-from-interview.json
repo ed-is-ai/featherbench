@@ -8,7 +8,7 @@
     "checks": [
       {
         "type": "regex",
-        "pattern": "(?i)\\bfact\\b",
+        "pattern": "(?i:\\bfact\\s+table\\b|\\bfact[_-][a-z0-9_]*\\b)|\\bFact[A-Z][A-Za-z0-9_]*\\b",
         "label": "names a fact table"
       },
       {

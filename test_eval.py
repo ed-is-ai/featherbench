@@ -280,6 +280,38 @@ class TestCheckers(unittest.TestCase):
         self.assertEqual(harness.extract_code(text), "x = 1\ny = 2\nz = 3\n")
 
 
+class TestBenchmarkTaskCheckerRegressions(unittest.TestCase):
+    """Regression coverage for checker false negatives found in the 2026-09-22 run."""
+
+    def _leaf(self, task_id, label):
+        task = json.loads((harness.TASKS_DIR / f"{task_id}.json").read_text())
+        return next(c for c in task["checker"]["checks"] if c.get("label") == label)
+
+    def _check(self, spec, text):
+        return harness.run_check(spec, text, [])[0]
+
+    def test_fact_model_names_are_recognised(self):
+        spec = self._leaf("data-model-from-interview", "names a fact table")
+        self.assertTrue(self._check(spec, "FactSalesLine — grain: one item line on a sales receipt."))
+        self.assertTrue(self._check(spec, "The fact table is at receipt-line grain."))
+        self.assertFalse(self._check(spec, "The answer is factually correct."))
+
+    def test_budget_summary_counts_as_total_against_budget(self):
+        spec = self._leaf("realworld-holiday-plan-lisbon", "gives a total against budget")
+        self.assertTrue(self._check(
+            spec, "Budget: £1,400 for five days, plus £30 tax, leaving £70 spare against the £1,500 budget."))
+        self.assertTrue(self._check(spec, "Grand total: €1,200."))
+        self.assertTrue(self._check(spec, "| **Total** | **~£1,055** |"))
+        self.assertFalse(self._check(spec, "Day 1: £285. Day 2: £340."))
+
+    def test_scheduled_sunday_long_runs_count(self):
+        spec = self._leaf("realworld-marathon-pb-plan", "includes long runs")
+        self.assertTrue(self._check(spec, "Week 13 — peak: Tue club 8; Thu 8 easy; Sun 20 easy."))
+        self.assertTrue(self._check(spec, "Week 11: Saturday 20 miles easy."))
+        self.assertTrue(self._check(spec, "The long run is 18 miles."))
+        self.assertFalse(self._check(spec, "Week 1: Tue 5; Thu 5; Sun 8 easy."))
+
+
 class TestRubric(unittest.TestCase):
     def test_rubric_mean(self):
         self.assertEqual(harness.rubric_mean({"a": {"score": 8}, "b": {"score": 7},
