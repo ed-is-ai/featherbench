@@ -71,6 +71,13 @@
     "effort": "high",
     "max_tokens": 64000
   },
+  "sonnet-5-5": {
+    "enabled": true,
+    "model": "anthropic/claude-sonnet-5.5",
+    "provider_order": ["anthropic"],
+    "effort": "high",
+    "max_tokens": 64000
+  },
   "sonnet-4-6": {
     "enabled": false,
     "model": "anthropic/claude-sonnet-4.6",
@@ -392,6 +399,13 @@
   "gpt-6-luna": {
     "enabled": true,
     "model": "openai/gpt-6-luna",
+    "provider_order": ["openai"],
+    "effort": "high",
+    "sampling": {"seed": 7}
+  },
+  "gpt-6.1-sol": {
+    "enabled": true,
+    "model": "openai/gpt-6.1-sol",
     "provider_order": ["openai"],
     "effort": "high",
     "sampling": {"seed": 7}
