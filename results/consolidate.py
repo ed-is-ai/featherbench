@@ -102,6 +102,14 @@ SOURCE_RUNS = [
     # seed:7, exact openai route. usage.cost matched the list rate ($2 / $10 per
     # 1M); no correction was needed. New model entry.
     ("results-20260922T225829Z.jsonl", "2026-09-22"),
+    # Claude Sonnet 5.5, issue #85, 1 trial x 28 tasks, rubric-on (fable-5),
+    # effort:high, max_tokens:64000, exact anthropic route. usage.cost matched
+    # the list rate ($2 / $10 per 1M); no correction was needed. New model entry.
+    ("results-20261002T224740Z.jsonl", "2026-10-02"),
+    # GPT-6.1 Sol, issue #86, 1 trial x 28 tasks, rubric-on (fable-5),
+    # effort:high, seed:7, exact openai route. usage.cost matched the list rate
+    # ($2 / $10 per 1M); no correction was needed. New model entry.
+    ("results-20261002T224743Z.jsonl", "2026-10-02"),
 ]
 
 RETIRED_TASKS = set()
