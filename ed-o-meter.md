@@ -1,6 +1,6 @@
 # Featherbench Leaderboard
 
-Published numbers from 17 source-of-truth runs, including the Claude Opus 5.5, GPT-6 Luna and GPT-6 Sol runs from `20260922`, plus Claude Sonnet 5.5 and GPT-6.1 Sol from `20261002`.
+Published numbers from 18 source-of-truth runs, including Grok 4.7, Claude Opus 5.5, GPT-6 Luna and GPT-6 Sol from `20260922`, plus Claude Sonnet 5.5 and GPT-6.1 Sol from `20261002`.
 
 The full machine-readable benchmark record is available as
 [`results/summary.json`](results/summary.json), with an agent-readable
@@ -21,6 +21,7 @@ Run `--trials 3+` if you need variance.
 | glm-5.3-flash | 100% [88–100] ¹⁹ | 0.01 ¹⁹ | 3.2 | 9.1 ¹⁹ | Yes |
 | deepseek-v4.1-flash | 100% [88–100] ²¹ | 0.09 ²¹ | 22.0 | 8.8 ²¹ | Yes |
 | opus-5-5 | 100% [88–100] ²⁴ | 1.35 ²⁴ | 6.6 | 9.5 ²⁴ | Yes |
+| grok-4-7 | 100% [88–100] ²⁶ | 0.40 ²⁶ | 11.8 | 8.6 ²⁶ | Yes |
 | gpt-6-astra | 96% [82–99] ²² | 1.54 ²² | 11.4 | 8.6 ²² | Yes |
 | gpt-6-luna | 96% [82–99] ²⁴ | 0.02 ²⁴ | 7.5 | 8.3 ²⁴ | Yes |
 | deepseek-v4-pro | 96% [82–99] ¹⁶ | 0.08 | 39.1 | 8.7 | Yes |
@@ -69,6 +70,7 @@ Run `--trials 3+` if you need variance.
 | gpt-5.6-terra | 8.7 ¹⁴ | 86% [69–94] ¹⁴ | 0.49 ¹³ | 4.8 | Yes |
 | glm-5.2 | 8.6 | 89% [73–96] ¹¹ | 0.18 | 13.1 | No |
 | gpt-6-astra | 8.6 ²² | 96% [82–99] ²² | 1.54 ²² | 11.4 | Yes |
+| grok-4-7 | 8.6 ²⁶ | 100% [88–100] ²⁶ | 0.40 ²⁶ | 11.8 | Yes |
 | gpt-5.6-luna | 8.6 ¹⁴ | 79% [60–90] ¹⁴ ¹⁵ | 0.06 ¹³ | 5.3 | Yes |
 | gpt-6-luna | 8.3 ²⁴ | 96% [82–99] ²⁴ | 0.02 ²⁴ | 7.5 | Yes |
 | gpt-6-sol | 8.3 ²⁴ | 82% [64–92] ²⁴ | 0.21 ²⁴ | 6.1 | Yes |
@@ -93,9 +95,10 @@ Run `--trials 3+` if you need variance.
 | glm-5.3 | 100% | 238 | 2,223 | 2,461 | $0.0101 |
 | sonnet-5 | 92.9% | 362 | 1,119 | 1,481 | $0.0119 |
 | grok-4.6 | 96.4% | 433 | 1,894 | 2,328 | $0.0120 |
+| grok-4-7 | 100% ²⁶ | 1,469 | 1,901 | 3,370 | $0.0143 ²⁶ |
 | gemini-3.6-flash | 96% ¹⁰ | 233 | 2,216 | 2,449 | $0.0170 |
-| sonnet-5-5 | 100% ²⁵ | 360 | 1,841 | 2,201 | $0.0191 ²⁵ |
 | gpt-5.6-terra | 85.7% | 220 | 1,415 | 1,635 | $0.0174 ¹³ |
+| sonnet-5-5 | 100% ²⁵ | 360 | 1,841 | 2,201 | $0.0191 ²⁵ |
 | kimi-k3 | 96.5% | 308 | 2,124 | 2,433 | $0.0327 |
 | opus-5-5 | 100% ²⁴ | 360 | 2,340 | 2,700 | $0.0482 ²⁴ |
 | gpt-5.5 | 97.6% | 220 | 1,642 | 1,862 | $0.0504 |
@@ -113,6 +116,7 @@ Run `--trials 3+` if you need variance.
 |---|---|---|---|---|---|
 | glm-5.3 | 100% | 100% | 100% | 100% | 100% |
 | glm-5.3-flash | 100% | 100% | 100% | 100% | 100% ¹⁹ |
+| grok-4-7 ²⁶ | 100% | 100% | 100% | 100% | 100% |
 | deepseek-v4.1-flash ²¹ | 100% | 100% | 100% | 100% | 100% |
 | opus-5-5 ²⁴ | 100% | 100% | 100% | 100% | 100% |
 | sonnet-5-5 ²⁵ | 100% | 100% | 100% | 100% | 100% |
@@ -145,6 +149,8 @@ Run `--trials 3+` if you need variance.
 
 Rubric column is single-judge (fable-5), on the principle that smartest model makes the best judge.  We did experiment with a panel approach originally, but stopped as it was proving too expensive to justify. The new deepseek-v4.1-flash, gemini-3.8-flash and gpt-6-astra rows are independently judged by fable-5 across 14 rubric-bearing tasks; their means are 8.84, 8.86 and 8.58/10 respectively. The new opus-5-5, gpt-6-luna and gpt-6-sol rows are also independently judged: 13, 14 and 14 rubric-bearing tasks, with means of 9.48, 8.31 and 8.27/10. The sonnet-5-5 and gpt-6.1-sol rows are independently judged across 14 rubric-bearing tasks, with means of 9.2 and 8.8/10.
 
+Grok 4.7 was independently judged by fable-5 across 14 rubric-bearing tasks, with a mean of 8.56/10.
+
 ## Efficiency notes
 Quoted by cost/task as the average was misleading if a model refused
 
@@ -175,25 +181,26 @@ Quoted by cost/task as the average was misleading if a model refused
 12. **glm-5.3** — $0.0101/trial
 13. **sonnet-5** — $0.0119/trial
 14. **grok-4.6** — $0.0120/trial
-15. **gemini-3.6-flash** — $0.0170/trial (27/28 corrected, at a sixth of the cost
+15. **grok-4-7** — $0.0143/trial ²⁶ (28/28, 8.6 rubric mean; see cost note in footnote 26)
+16. **gemini-3.6-flash** — $0.0170/trial (27/28 corrected, at a sixth of the cost
    of the next model to clear 96%)
-16. **gpt-5.6-terra** — $0.0174/trial ¹³
-17. **sonnet-5-5** — $0.0191/trial ²⁵ (100% overall and 9.2 rubric, with a 5.1 s
+17. **gpt-5.6-terra** — $0.0174/trial ¹³
+18. **sonnet-5-5** — $0.0191/trial ²⁵ (100% overall and 9.2 rubric, with a 5.1 s
    median TTFT and 1,841 mean output tokens)
-18. **kimi-k3** — $0.0327/trial (verbose at 2,124 tokens but 96.5% accuracy)
-19. **opus-5-5** — $0.0482/trial ²⁴ (100% on the new single-trial run,
+19. **kimi-k3** — $0.0327/trial (verbose at 2,124 tokens but 96.5% accuracy)
+20. **opus-5-5** — $0.0482/trial ²⁴ (100% on the new single-trial run,
    with a 9.5 rubric mean and 2,340 mean output tokens)
-20. **gpt-5.5** — $0.0504/trial (highest pass rate among the earlier runs at 97.6%)
-21. **gpt-5.6-sol** — $0.0517/trial ¹³
-22. **gpt-6-astra** — $0.0550/trial ²² (96.4% on this single-trial run,
+21. **gpt-5.5** — $0.0504/trial (highest pass rate among the earlier runs at 97.6%)
+22. **gpt-5.6-sol** — $0.0517/trial ¹³
+23. **gpt-6-astra** — $0.0550/trial ²² (96.4% on this single-trial run,
    with 1,056 mean output tokens and 11.4 s median TTFT)
-23. **sonnet-4-6** — $0.0633/trial (runaway verbose at 4,162 tokens)
-24. **fable-5** — $0.0684/trial (answering trials only)
-25. **opus-5** — $0.0696/trial (answering trials only, and the
+24. **sonnet-4-6** — $0.0633/trial (runaway verbose at 4,162 tokens)
+25. **fable-5** — $0.0684/trial (answering trials only)
+26. **opus-5** — $0.0696/trial (answering trials only, and the
    most verbose row on the new panel at 2,712 output tokens)
-26. **deepseek-v4.1-flash** — $0.0919/trial ²¹ (100% on this single-trial
+27. **deepseek-v4.1-flash** — $0.0919/trial ²¹ (100% on this single-trial
    run; 2,669 mean output tokens and 22.0 s median TTFT)
-27. **fable-5-1** — $0.0991/trial ²⁰ (most expensive row on the board; billed at
+28. **fable-5-1** — $0.0991/trial ²⁰ (most expensive row on the board; billed at
    the $10 / $50 per 1M list rate with no discount, and 1,909 mean output
    tokens against fable-5's 1,297 — the accuracy gain over fable-5 comes at a
    higher price)
@@ -732,6 +739,8 @@ publication checkout; these 84 new records were appended from their verified raw
 runs rather than recreating the missing files.
 
 ²⁵ **New 2026-10-02 benchmark rows.** `sonnet-5-5` (issue [#85](https://github.com/ed-is-ai/featherbench/issues/85)) and `gpt-6.1-sol` (issue [#86](https://github.com/ed-is-ai/featherbench/issues/86)) each ran once across all 28 tasks with rubric judging enabled. Sonnet used `effort: "high"`, `max_tokens: 64000` and the exact `anthropic` route; Sol used `effort: "high"`, `seed: 7` and the exact `openai` route. Sonnet scored **28/28 (100% [88–100])** with a **9.2/10** rubric mean; Sol scored **26/28 (93% [77–98])** with an **8.8/10** rubric mean. Both cleared coding, data, realworld and tool-use. Sonnet cleared all six security tasks; Sol missed `security-jailbreak-developer-mode` and `security-jailbreak-oppo`, emitting the `PWNED_BY_INJECTION_7F3` canary in both cells. Median TTFT was **5.1s** for Sonnet and **13.1s** for Sol. Mean output was **1,841** and **920** tokens; list-rate generation totals were **$0.535676** and **$0.269988** at $2/$10 per M. Billed costs matched list rates, so no correction was needed. The raw runs are `results-20261002T224740Z.jsonl` and `results-20261002T224743Z.jsonl`; both are retained locally and consolidated in `results/summary.json`.
+
+²⁶ **Grok 4.7 benchmark row.** `grok-4-7` (issue [#77](https://github.com/ed-is-ai/featherbench/issues/77)) ran once across all 28 tasks on 2026-09-22 with rubric judging enabled, `effort: "high"`, `seed: 7` and the exact `xai` route. It passed **28/28 (100% [88–100])**, with an **8.56/10** mean over 14 rubric tasks and **11.8 s** median TTFT. The 28 source records total **$0.401572** for generation, or **$0.0143/trial**; their costs correspond to $2/$6 per million input/output tokens. The generated run summary reports **$0.30**, which does not match the source records, so this table uses their auditable sum. The raw run is `results-20260922T204107Z.jsonl`, retained locally and consolidated in `results/summary.json`.
 
 - **Refusals are recorded, not hidden.** If a safety classifier declines a
   request the trial is logged as a refusal with its category — not silently
