@@ -102,6 +102,9 @@ SOURCE_RUNS = [
     # seed:7, exact openai route. usage.cost matched the list rate ($2 / $10 per
     # 1M); no correction was needed. New model entry.
     ("results-20260922T225829Z.jsonl", "2026-09-22"),
+    # Grok 4.7, issue #77, 1 trial x 28 tasks, rubric-on (fable-5),
+    # effort:high, seed:7, exact xai route. New model entry.
+    ("results-20260922T204107Z.jsonl", "2026-09-22"),
     # Claude Sonnet 5.5, issue #85, 1 trial x 28 tasks, rubric-on (fable-5),
     # effort:high, max_tokens:64000, exact anthropic route. usage.cost matched
     # the list rate ($2 / $10 per 1M); no correction was needed. New model entry.
