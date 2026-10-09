@@ -95,6 +95,13 @@
     ],
     "max_tokens": 32000
   },
+  "haiku-5-5": {
+    "enabled": true,
+    "model": "anthropic/claude-haiku-5.5",
+    "provider_order": ["anthropic"],
+    "effort": "high",
+    "max_tokens": 64000
+  },
   "gpt-5.5": {
     "enabled": true,
     "model": "openai/gpt-5.5",
