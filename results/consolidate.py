@@ -105,6 +105,16 @@ SOURCE_RUNS = [
     # Grok 4.7, issue #77, 1 trial x 28 tasks, rubric-on (fable-5),
     # effort:high, seed:7, exact xai route. New model entry.
     ("results-20260922T204107Z.jsonl", "2026-09-22"),
+    # Claude Haiku 5.5, issue #92, 1 trial x 28 tasks, rubric-on (fable-5),
+    # effort:high, max_tokens:64000, exact anthropic route. Issue #93 fixes its
+    # data-csv-mapping-customer checker false negative during re-scoring. This
+    # --resume output kept the two valid cells from results-20261009T205025Z.jsonl
+    # and re-ran its 26 errored
+    # cells; it supersedes that partial and the wholly invalid 28x401 run
+    # results-20261009T141943Z.jsonl per rule 1. usage.cost matched the live
+    # Anthropic list rate ($0.10 in / $0.50 out per 1M, endpoint discount 0)
+    # for every record, so billed == list and no cost correction applies.
+    ("results-20261010T075434Z.jsonl", "2026-10-10"),
     # Claude Sonnet 5.5, issue #85, 1 trial x 28 tasks, rubric-on (fable-5),
     # effort:high, max_tokens:64000, exact anthropic route. usage.cost matched
     # the list rate ($2 / $10 per 1M); no correction was needed. New model entry.
