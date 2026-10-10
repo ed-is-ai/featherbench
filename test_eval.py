@@ -281,7 +281,7 @@ class TestCheckers(unittest.TestCase):
 
 
 class TestBenchmarkTaskCheckerRegressions(unittest.TestCase):
-    """Regression coverage for checker false negatives found in the 2026-09-22 run."""
+    """Regression coverage for checker false negatives found in published runs."""
 
     def _leaf(self, task_id, label):
         task = json.loads((harness.TASKS_DIR / f"{task_id}.json").read_text())
@@ -310,6 +310,12 @@ class TestBenchmarkTaskCheckerRegressions(unittest.TestCase):
         self.assertTrue(self._check(spec, "Week 11: Saturday 20 miles easy."))
         self.assertTrue(self._check(spec, "The long run is 18 miles."))
         self.assertFalse(self._check(spec, "Week 1: Tue 5; Thu 5; Sun 8 easy."))
+
+    def test_unix_origin_formula_counts_as_epoch_conversion(self):
+        spec = self._leaf("data-csv-mapping-customer", "describes the epoch->date conversion")
+        self.assertTrue(self._check(
+            spec, "signup_date = 1970-01-01T00:00:00Z + signup_ts seconds, converted to UTC date."))
+        self.assertFalse(self._check(spec, "Convert signup_ts to signup_date."))
 
 
 class TestRubric(unittest.TestCase):

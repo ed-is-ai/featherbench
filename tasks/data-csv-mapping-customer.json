@@ -51,7 +51,7 @@
       },
       {
         "type": "regex",
-        "pattern": "(?i)(epoch|unix|from_?unixtime|to_?timestamp)",
+        "pattern": "(?i)(epoch|unix|from_?unixtime|to_?timestamp|1970-01-01[^\\n]{0,160}signup_ts)",
         "label": "describes the epoch->date conversion"
       }
     ]
