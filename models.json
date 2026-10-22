@@ -423,5 +423,13 @@
     "provider_order": ["openai"],
     "effort": "high",
     "sampling": {"seed": 7}
+  },
+  "gemini-4-argon": {
+    "enabled": false,
+    "model": "google/gemini-4-argon",
+    "provider_order": ["google-vertex/global"],
+    "effort": "high",
+    "max_tokens": 64000,
+    "sampling": {"seed": 7}
   }
 }
