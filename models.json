@@ -447,5 +447,12 @@
     "effort": "high",
     "max_tokens": 64000,
     "sampling": {"temperature": 0.0, "top_p": 1.0}
+  },
+  "muse-wonder": {
+    "enabled": false,
+    "model": "meta/muse-wonder",
+    "provider_order": ["meta"],
+    "effort": "high",
+    "max_tokens": 64000
   }
 }
