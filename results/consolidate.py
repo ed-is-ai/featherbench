@@ -123,6 +123,15 @@ SOURCE_RUNS = [
     # effort:high, seed:7, exact openai route. usage.cost matched the list rate
     # ($2 / $10 per 1M); no correction was needed. New model entry.
     ("results-20261002T224743Z.jsonl", "2026-10-02"),
+    # Reflection Beam, Muse Spark Open, Muse Wonder and Gemini 4 Argon, issues
+    # #95-#98, 1 trial x 28 tasks each, rubric-on (fable-5), exact pinned
+    # providers, effort:high. Complete run assembled from bounded batches after
+    # transient TLS/API connection failures; all 112 cells are valid and the
+    # six tool-call-only empty-text rows passed their checkers. cost_usd is
+    # recomputed from tokens at current pinned list rates: Beam $0.40/$1.20,
+    # Muse Spark Open $1.25/$4.25, Muse Wonder $4/$20, Gemini 4 Argon $2/$10
+    # per 1M tokens. The endpoint billed values were slightly discounted.
+    ("results-20261023T220503Z.jsonl", "2026-10-23"),
 ]
 
 RETIRED_TASKS = set()
