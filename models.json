@@ -431,5 +431,13 @@
     "effort": "high",
     "max_tokens": 64000,
     "sampling": {"seed": 7}
+  },
+  "muse-spark-open": {
+    "enabled": false,
+    "model": "meta/muse-spark-open",
+    "provider_order": ["together"],
+    "effort": "high",
+    "max_tokens": 64000,
+    "sampling": {"temperature": 0.0, "top_p": 1.0}
   }
 }
