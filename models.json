@@ -439,5 +439,13 @@
     "effort": "high",
     "max_tokens": 64000,
     "sampling": {"temperature": 0.0, "top_p": 1.0}
+  },
+  "beam-1.0-501b-a23b": {
+    "enabled": false,
+    "model": "reflection/beam-1.0-501b-a23b",
+    "provider_order": ["together"],
+    "effort": "high",
+    "max_tokens": 64000,
+    "sampling": {"temperature": 0.0, "top_p": 1.0}
   }
 }
