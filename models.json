@@ -454,5 +454,12 @@
     "provider_order": ["meta"],
     "effort": "high",
     "max_tokens": 64000
+  },
+  "kimi-k3.1-pro": {
+    "enabled": false,
+    "model": "moonshotai/kimi-k3.1-pro",
+    "provider_order": ["moonshotai/mxfp4"],
+    "effort": "max",
+    "max_tokens": 64000
   }
 }
