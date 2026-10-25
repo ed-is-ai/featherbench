@@ -132,6 +132,13 @@ SOURCE_RUNS = [
     # Muse Spark Open $1.25/$4.25, Muse Wonder $4/$20, Gemini 4 Argon $2/$10
     # per 1M tokens. The endpoint billed values were slightly discounted.
     ("results-20261023T220503Z.jsonl", "2026-10-23"),
+    # Kimi K3.1 Pro, issue #104, 1 trial x 28 tasks. Model answers were run
+    # with effort:max, max_tokens:64000 and the exact moonshotai/mxfp4 route;
+    # fable-5 rubric judging was completed retroactively from the saved answers
+    # after the answer run. All 14 rubric-bearing tasks scored, with an 8.86
+    # mean. cost_usd is already list-rate normalized from tokens at $2/$10 per
+    # 1M input/output tokens; generation total is $1.285138.
+    ("results-20261024T231720Z-rubric.jsonl", "2026-10-24"),
 ]
 
 RETIRED_TASKS = set()
