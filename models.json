@@ -461,5 +461,16 @@
     "provider_order": ["moonshotai/mxfp4"],
     "effort": "max",
     "max_tokens": 64000
+  },
+  "gpt-6.2-astra": {
+    "enabled": false,
+    "model": "openai/gpt-6.2-astra",
+    "provider_order": [
+      "openai"
+    ],
+    "effort": "high",
+    "sampling": {
+      "seed": 7
+    }
   }
 }
