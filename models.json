@@ -461,5 +461,14 @@
     "provider_order": ["moonshotai/mxfp4"],
     "effort": "max",
     "max_tokens": 64000
+  },
+  "mistral-large-4": {
+    "enabled": false,
+    "model": "mistralai/mistral-large-4-0",
+    "provider_order": [
+      "mistral/zdr"
+    ],
+    "effort": "high",
+    "max_tokens": 64000
   }
 }
