@@ -472,5 +472,23 @@
     "sampling": {
       "seed": 7
     }
+  },
+  "mistral-large-4": {
+    "enabled": false,
+    "model": "mistralai/mistral-large-4-0",
+    "provider_order": [
+      "mistral/zdr"
+    ],
+    "effort": "high",
+    "max_tokens": 64000
+  },
+  "fable-5-2": {
+    "enabled": false,
+    "model": "anthropic/claude-fable-5.2",
+    "provider_order": [
+      "anthropic"
+    ],
+    "effort": "high",
+    "max_tokens": 64000
   }
 }
