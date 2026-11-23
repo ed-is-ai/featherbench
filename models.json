@@ -470,5 +470,14 @@
     ],
     "effort": "high",
     "max_tokens": 64000
+  },
+  "fable-5-2": {
+    "enabled": false,
+    "model": "anthropic/claude-fable-5.2",
+    "provider_order": [
+      "anthropic"
+    ],
+    "effort": "high",
+    "max_tokens": 64000
   }
 }
